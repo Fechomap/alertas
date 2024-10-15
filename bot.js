@@ -23,7 +23,7 @@ bot.setWebHook(`${url}${webhookPath}`);
 
 // IDs de usuarios
 const operatorIds = [7143094298, 7754458578]; // IDs de los operadores que pueden iniciar alertas
-const alertManagerIds = [1022124142, 7758965062, 5660087041]; // IDs de los usuarios que pueden detener alertas
+const alertManagerIds = [1022124142, 7758965062, 5660087041, 7143094298]; // IDs de los usuarios que pueden detener alertas
 
 // Estructuras para almacenar alertas y estados
 let activeAlerts = {}; // Estructura: { chatId: { userId: { alertType: { interval, userName } } } }
