@@ -33,22 +33,22 @@ let userStates = {}; // Estructura: { userId: { chatId, step, data } }
 // Mapeo de alertas
 const alertTypes = {
   Conferencia: {
-    message: '⚠️⚠️ *CONFERENCIA* atendida. 📞 Enseguida le llaman. Alerta desactivada. ¡Gracias! ✔️'
+    message: '⚠️⚠️ Cabina, por favor apóyame con una conferencia. ¡Gracias! 📞'
   },
   Maniobras: {
     message: '' // Se generará dinámicamente en MANIOBRAS
   },
   USUARIO_NO_ESTA_EN_VH: {
-    message: '⚠️⚠️ *USUARIO NO ESTÁ EN VH* en proceso. 📞 Enseguida le marcamos para que salga. Alerta desactivada. ¡Gracias! ✔️'
+    message: '⚠️⚠️ Cabina, por favor apóyame avisando al usuario que salga. ¡Gracias! 🚗'
   },
   TR: {
-    message: '🛎️🛎️ *TIEMPO REGLAMENTARIO* completado con éxito. Alerta desactivada. ¡Gracias! ✔️'
+    message: '' // TR tiene alertas programadas
   },
   HORA_DE_ESPERA: {
-    message: '🛎️🛎️ *HORA DE ESPERA* completada con éxito. Alerta desactivada. ¡Gracias! ✔️'
+    message: '' // HORA_DE_ESPERA tiene alertas programadas
   },
   VALIDACION_DE_ORIGEN: {
-    message: '🆗🆗 *VALIDACIÓN DE ORIGEN* en proceso. 📞 Se contactará al usuario para confirmar la ubicación. Alerta desactivada. ¡Gracias! ✔️'
+    message: '⚠️⚠️ Cabina, por favor apóyame con la validación del origen. ¡Gracias! 📍'
   }
 };
 
@@ -212,7 +212,9 @@ function handleAlertManagerAction(alertType, chatId, userId, from) {
         userName: getUserName(from)
       };
       globalActiveAlerts[chatId] = chatAlerts;
-      manageTimedAlertGlobal(chatId, 'TR', '⚠️⚠️ *TIEMPO REGLAMENTARIO* completado con éxito. Alerta desactivada. ¡Gracias! 🛎️✔️', 1200000); // 20 min
+      // Programar mensajes de TR
+      manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** Estamos a la mitad del tiempo. 🔔 Si es posible, realiza una conferencia de nuevo.', 600000); // 10 min
+      manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** El tiempo ha finalizado. ✅', 1200000); // 20 min
       break;
     case 'HORA_DE_ESPERA':
       if (chatAlerts['HORA_DE_ESPERA']) {
@@ -232,7 +234,9 @@ function handleAlertManagerAction(alertType, chatId, userId, from) {
         userName: getUserName(from)
       };
       globalActiveAlerts[chatId] = chatAlerts;
-      manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⚠️⚠️ *HORA DE ESPERA* completada con éxito. Alerta desactivada. ¡Gracias! 🛎️✔️', 3600000); // 60 min
+      // Programar mensajes de HORA_DE_ESPERA
+      manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** Quedan 15 minutos para que finalice. 🔔 Si es posible, realiza una conferencia de nuevo.', 2700000); // 45 min
+      manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** El tiempo ha finalizado. ✅', 3600000); // 60 min
       break;
     default:
       // Acción desconocida, no hacer nada
@@ -307,7 +311,7 @@ function handleUserState(userId, text, chatId, from) {
       }
       state.data.quantity = quantity;
       state.step = 'awaiting_maniobras_description';
-      bot.sendMessage(chatId, '✏️ Indíqueme por favor qué maniobras estará realizando.', { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, '✏️ Indícame por favor qué maniobras estará realizando.', { parse_mode: 'Markdown' });
       break;
     case 'awaiting_maniobras_description':
       const description = text.trim();
@@ -315,7 +319,7 @@ function handleUserState(userId, text, chatId, from) {
         bot.sendMessage(chatId, '❌ *Por favor, ingresa una descripción válida.*', { parse_mode: 'Markdown' });
         return;
       }
-      const alertText = `⚠️⚠️ *MANIOBRAS* atendidas. 🔧 En breve se notificará quién las cubre. Alerta desactivada. ¡Gracias! ✔️`;
+      const alertText = `⚠️⚠️ Cabina, se requieren ${state.data.quantity} maniobras. Se realizará: ${description}. Quedo al pendiente de la autorización. ¡Gracias! 🔧`;
       alertTypes.Maniobras.message = alertText; // Actualizar el mensaje de la alerta MANIOBRAS
       startAlert(userId, 'Maniobras', chatId, getUserName(from));
       delete userStates[userId];
@@ -361,10 +365,13 @@ function startAlert(userId, alertType, chatId, userName) {
 
   const message = alertInfo.message;
 
-  // Enviar la alerta al chat
+  // Enviar la primera alerta inmediatamente al chat
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: {} }).then(() => {
     // Guardar la alerta con su tipo y nombre de usuario
     activeAlerts[chatId][userId][alertType] = {
+      interval: setInterval(() => {
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: {} }).catch(() => {});
+      }, 20000), // Intervalo fijo de 20 segundos
       message: message,
       userName: userName
     };
@@ -390,6 +397,10 @@ function manageTimedAlertGlobal(chatId, alertType, message, delay) {
 // Función para detener una alerta específica para un usuario
 function stopAlertForUser(chatId, targetUserId, alertType) {
   if (activeAlerts[chatId] && activeAlerts[chatId][targetUserId] && activeAlerts[chatId][targetUserId][alertType]) {
+    // Si es una alerta con intervalos
+    if (activeAlerts[chatId][targetUserId][alertType].interval) {
+      clearInterval(activeAlerts[chatId][targetUserId][alertType].interval);
+    }
     // Eliminar la alerta
     delete activeAlerts[chatId][targetUserId][alertType];
   }
