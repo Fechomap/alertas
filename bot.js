@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
 // URL de tu aplicación en Heroku
-const url = process.env.HEROKU_APP_URL || 'https://tu-app.herokuapp.com'; // Reemplaza con tu URL real
+const url = process.env.HEROKU_APP_URL || 'https://chubb-bot-0dd0033c99dc.herokuapp.com'; // Reemplaza con tu URL real
 
 // Crear el bot utilizando webhooks
 const bot = new TelegramBot(token, { webHook: true });
