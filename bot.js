@@ -22,7 +22,7 @@ const webhookPath = `/bot${token}`;
 bot.setWebHook(`${url}${webhookPath}`);
 
 // IDs de usuarios
-const operatorIds = [7143094298, 7754458578]; // IDs de los operadores que pueden iniciar alertas
+const operatorIds = [7143094298, 7754458578, 7509818905, 8048487029]; // IDs de los operadores que pueden iniciar alertas
 const alertManagerIds = [1022124142, 7758965062, 5660087041, 6330970125]; // IDs de los usuarios que pueden detener alertas
 
 // Estructuras para almacenar alertas y estados
