@@ -1,10 +1,17 @@
 // Cargar variables de entorno
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const TelegramBot = require('node-telegram-bot-api');
-const { Low, JSONFile } = require('lowdb');
-const path = require('path');
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import bodyParser from 'body-parser';
+import TelegramBot from 'node-telegram-bot-api';
+import { Low, JSONFile } from 'lowdb';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Obtener __dirname en ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configurar Lowdb
 const dbFile = path.join(__dirname, 'db.json');
