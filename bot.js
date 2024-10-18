@@ -366,11 +366,11 @@ function startAlert(userId, alertType, chatId, userName) {
   const message = alertInfo.message;
 
   // Enviar la primera alerta inmediatamente al chat
-  bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: {} }).then(() => {
+  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).then(() => {
     // Guardar la alerta con su tipo y nombre de usuario
     activeAlerts[chatId][userId][alertType] = {
       interval: setInterval(() => {
-        bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: {} }).catch(() => {});
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).catch(() => {});
       }, 20000), // Intervalo fijo de 20 segundos
       message: message,
       userName: userName
@@ -384,7 +384,7 @@ function manageTimedAlertGlobal(chatId, alertType, message, delay) {
     const chatAlerts = globalActiveAlerts[chatId] || {};
     // Verificar si la alerta global no ha sido detenida
     if (chatAlerts[alertType] && chatAlerts[alertType].active) {
-      bot.sendMessage(chatId, `${message}`, { parse_mode: 'Markdown', reply_markup: {} }).catch(() => {});
+      bot.sendMessage(chatId, `${message}`, { parse_mode: 'Markdown' }).catch(() => {});
       // Si este es el mensaje final, desactivar la alerta
       if (message.includes('ha finalizado')) {
         delete chatAlerts[alertType];
