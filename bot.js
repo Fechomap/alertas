@@ -1,31 +1,8 @@
 // Cargar variables de entorno
-import dotenv from 'dotenv';
-dotenv.config();
-
-import express from 'express';
-import bodyParser from 'body-parser';
-import TelegramBot from 'node-telegram-bot-api';
-import { Low, JSONFile } from 'lowdb';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Obtener __dirname en ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configurar Lowdb
-const dbFile = path.join(__dirname, 'db.json');
-const adapter = new JSONFile(dbFile);
-const db = new Low(adapter);
-
-// Inicializar la base de datos
-async function initDB() {
-  await db.read();
-  db.data = db.data || { activeAlerts: {}, globalActiveAlerts: {}, userStates: {} };
-  await db.write();
-}
-
-initDB();
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const TelegramBot = require('node-telegram-bot-api');
 
 // Crear instancia de Express
 const app = express();
@@ -47,6 +24,11 @@ bot.setWebHook(`${url}${webhookPath}`);
 // IDs de usuarios
 const operatorIds = [7143094298, 7754458578, 7509818905, 8048487029]; // IDs de los operadores que pueden iniciar alertas
 const alertManagerIds = [1022124142, 7758965062, 5660087041, 6330970125]; // IDs de los usuarios que pueden detener alertas
+
+// Estructuras para almacenar alertas y estados
+let activeAlerts = {}; // Estructura: { chatId: { userId: { alertType: { interval, userName } } } }
+let globalActiveAlerts = {}; // Para alertas TR y HORA_DE_ESPERA por chat
+let userStates = {}; // Estructura: { userId: { chatId, step, data } }
 
 // Mapeo de alertas
 const alertTypes = {
@@ -131,19 +113,13 @@ function sendMainMenu(chatId) {
 }
 
 // Manejar el comando /start
-bot.onText(/\/start/, async (msg) => {
+bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
-
-  // Inicializar el estado del usuario en la base de datos
-  db.data.userStates[userId] = { chatId, step: null, data: {} };
-  await db.write();
-
   sendMainMenu(chatId);
 });
 
 // Manejar mensajes y acciones
-bot.on('message', async (msg) => {
+bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const text = msg.text ? msg.text.trim() : '';
@@ -152,11 +128,8 @@ bot.on('message', async (msg) => {
   // Ignorar mensajes de bots y el comando /start
   if (msg.from.is_bot || text === '/start') return;
 
-  // Leer la base de datos
-  await db.read();
-
   // Manejar estados de conversación (e.g., Maniobras)
-  if (db.data.userStates[userId] && db.data.userStates[userId].chatId === chatId) {
+  if (userStates[userId] && userStates[userId].chatId === chatId) {
     handleUserState(userId, text, chatId, from);
     return;
   }
@@ -192,16 +165,16 @@ bot.on('message', async (msg) => {
 });
 
 // Función para manejar acciones de operatorIds
-async function handleOperatorAction(alertType, chatId, userId, from) {
+function handleOperatorAction(alertType, chatId, userId, from) {
   switch (alertType) {
     case 'Conferencia':
     case 'USUARIO_NO_ESTA_EN_VH':
     case 'VALIDACION_DE_ORIGEN':
-      await startAlert(userId, alertType, chatId, getUserName(from));
+      startAlert(userId, alertType, chatId, getUserName(from));
       break;
     case 'Maniobras':
       // Confirmación antes de proceder
-      await bot.sendMessage(chatId, '🛠️ *Estás iniciando el proceso de solicitud de maniobras, ¿deseas CONTINUAR?*', {
+      bot.sendMessage(chatId, '🛠️ *Estás iniciando el proceso de solicitud de maniobras, ¿deseas CONTINUAR?*', {
         parse_mode: 'Markdown',
         reply_markup: {
           keyboard: [['✅ Continuar', '❌ Cancelar']],
@@ -209,8 +182,7 @@ async function handleOperatorAction(alertType, chatId, userId, from) {
           one_time_keyboard: true
         }
       });
-      db.data.userStates[userId] = { chatId, step: 'confirming_maniobras', data: {} };
-      await db.write();
+      userStates[userId] = { chatId, step: 'confirming_maniobras', data: {} };
       break;
     default:
       // Acción desconocida, no hacer nada
@@ -219,8 +191,8 @@ async function handleOperatorAction(alertType, chatId, userId, from) {
 }
 
 // Función para manejar acciones de alertManagerIds (TR y HORA_DE_ESPERA)
-async function handleAlertManagerAction(alertType, chatId, userId, from) {
-  const chatAlerts = db.data.globalActiveAlerts[chatId] || {};
+function handleAlertManagerAction(alertType, chatId, userId, from) {
+  const chatAlerts = globalActiveAlerts[chatId] || {};
   switch (alertType) {
     case 'TR':
       if (chatAlerts['TR']) {
@@ -232,15 +204,14 @@ async function handleAlertManagerAction(alertType, chatId, userId, from) {
         return;
       }
       // Enviar mensaje de inicio al grupo
-      await bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 20 minutos para TIEMPO REGLAMENTARIO. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 20 minutos para TIEMPO REGLAMENTARIO. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
       // Iniciar alerta de TR
       chatAlerts['TR'] = {
         active: true,
         userId: userId,
         userName: getUserName(from)
       };
-      db.data.globalActiveAlerts[chatId] = chatAlerts;
-      await db.write();
+      globalActiveAlerts[chatId] = chatAlerts;
       // Programar mensajes de TR
       manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** Estamos a la mitad del tiempo. 🔔 Si es posible, realiza una conferencia de nuevo.', 600000); // 10 min
       manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** El tiempo ha finalizado. ✅', 1200000); // 20 min
@@ -255,15 +226,14 @@ async function handleAlertManagerAction(alertType, chatId, userId, from) {
         return;
       }
       // Enviar mensaje de inicio al grupo
-      await bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 60 minutos para la HORA DE ESPERA. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 60 minutos para la HORA DE ESPERA. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
       // Iniciar alerta de HORA_DE_ESPERA
       chatAlerts['HORA_DE_ESPERA'] = {
         active: true,
         userId: userId,
         userName: getUserName(from)
       };
-      db.data.globalActiveAlerts[chatId] = chatAlerts;
-      await db.write();
+      globalActiveAlerts[chatId] = chatAlerts;
       // Programar mensajes de HORA_DE_ESPERA
       manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** Quedan 15 minutos para que finalice. 🔔 Si es posible, realiza una conferencia de nuevo.', 2700000); // 45 min
       manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** El tiempo ha finalizado. ✅', 3600000); // 60 min
@@ -275,30 +245,28 @@ async function handleAlertManagerAction(alertType, chatId, userId, from) {
 }
 
 // Función para manejar desactivación de alertas por alertManagerIds
-async function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
+function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
   let alertFound = false;
   if (alertType === 'TR' || alertType === 'HORA_DE_ESPERA') {
-    const chatAlerts = db.data.globalActiveAlerts[chatId] || {};
+    const chatAlerts = globalActiveAlerts[chatId] || {};
     if (chatAlerts[alertType]) {
       delete chatAlerts[alertType];
-      db.data.globalActiveAlerts[chatId] = chatAlerts;
+      globalActiveAlerts[chatId] = chatAlerts;
       const message = cancelationMessages[alertType] || `🆗🆗 **ALERTA DE ${alertType.replace(/_/g, ' ')} CANCELADA.**`;
       // Enviar mensaje de cancelación al grupo
-      await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
       alertFound = true;
-      await db.write();
     }
   } else {
     // Desactivar la alerta si fue activada por un operatorId
-    const chatOperatorsAlerts = db.data.activeAlerts[chatId] || {};
+    const chatOperatorsAlerts = activeAlerts[chatId] || {};
     for (const operatorId of operatorIds) {
       if (chatOperatorsAlerts[operatorId] && chatOperatorsAlerts[operatorId][alertType]) {
-        await stopAlertForUser(chatId, operatorId, alertType);
+        stopAlertForUser(chatId, operatorId, alertType);
         const message = cancelationMessages[alertType] || `🆗🆗 **ALERTA DE ${alertType.replace(/_/g, ' ')} CANCELADA.**`;
         // Enviar mensaje de cancelación al grupo
-        await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
         alertFound = true;
-        await db.write();
         break; // Asumiendo que detenemos la primera que encontramos
       }
     }
@@ -310,8 +278,8 @@ async function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
 }
 
 // Manejar estados de conversación
-async function handleUserState(userId, text, chatId, from) {
-  const state = db.data.userStates[userId];
+function handleUserState(userId, text, chatId, from) {
+  const state = userStates[userId];
   if (state.chatId !== chatId) {
     // Ignorar mensajes de otros chats
     return;
@@ -320,130 +288,121 @@ async function handleUserState(userId, text, chatId, from) {
   switch (state.step) {
     case 'confirming_maniobras':
       if (normalizedText === 'continuar' || normalizedText === 'si') {
-        await bot.sendMessage(chatId, '🔢 ¿Cuántas maniobras necesita?', {
+        bot.sendMessage(chatId, '🔢 ¿Cuántas maniobras necesita?', {
           parse_mode: 'Markdown',
           reply_markup: {
             remove_keyboard: true
           }
         });
         state.step = 'awaiting_maniobras_quantity';
-        await db.write();
       } else if (normalizedText === 'cancelar' || normalizedText === 'no') {
         // Cancelar y regresar al menú principal
-        delete db.data.userStates[userId];
-        await db.write();
+        delete userStates[userId];
         sendMainMenu(chatId);
       } else {
-        await bot.sendMessage(chatId, 'Por favor, selecciona una opción válida.', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, 'Por favor, selecciona una opción válida.', { parse_mode: 'Markdown' });
       }
       break;
     case 'awaiting_maniobras_quantity':
       const quantity = parseInt(text);
       if (isNaN(quantity) || quantity <= 0) {
-        await bot.sendMessage(chatId, '❌ *Por favor, ingresa un número válido de maniobras.*', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, '❌ *Por favor, ingresa un número válido de maniobras.*', { parse_mode: 'Markdown' });
         return;
       }
       state.data.quantity = quantity;
       state.step = 'awaiting_maniobras_description';
-      await db.write();
-      await bot.sendMessage(chatId, '✏️ Indícame por favor qué maniobras estará realizando.', { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, '✏️ Indícame por favor qué maniobras estará realizando.', { parse_mode: 'Markdown' });
       break;
     case 'awaiting_maniobras_description':
       const description = text.trim();
       if (description.length === 0) {
-        await bot.sendMessage(chatId, '❌ *Por favor, ingresa una descripción válida.*', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, '❌ *Por favor, ingresa una descripción válida.*', { parse_mode: 'Markdown' });
         return;
       }
       const alertText = `⚠️⚠️ Cabina, se requieren ${state.data.quantity} maniobras. Se realizará: ${description}. Quedo al pendiente de la autorización. ¡Gracias! 🔧`;
       alertTypes.Maniobras.message = alertText; // Actualizar el mensaje de la alerta MANIOBRAS
-      await startAlert(userId, 'Maniobras', chatId, getUserName(from));
-      delete db.data.userStates[userId];
-      await db.write();
+      startAlert(userId, 'Maniobras', chatId, getUserName(from));
+      delete userStates[userId];
       // Regresar al menú principal
       sendMainMenu(chatId);
       break;
     default:
-      delete db.data.userStates[userId];
-      await db.write();
+      delete userStates[userId];
       // Estado desconocido, no hacer nada
       return;
   }
 }
 
 // Función para iniciar una alerta
-async function startAlert(userId, alertType, chatId, userName) {
+function startAlert(userId, alertType, chatId, userName) {
   const alertInfo = alertTypes[alertType];
   if (!alertInfo) {
     // Tipo de alerta desconocido, no hacer nada
     return;
   }
 
-  if (!db.data.activeAlerts[chatId]) {
-    db.data.activeAlerts[chatId] = {};
+  if (!activeAlerts[chatId]) {
+    activeAlerts[chatId] = {};
   }
-  if (!db.data.activeAlerts[chatId][userId]) {
-    db.data.activeAlerts[chatId][userId] = {};
+  if (!activeAlerts[chatId][userId]) {
+    activeAlerts[chatId][userId] = {};
   }
 
   // Verificar si la alerta ya está activa
-  if (db.data.activeAlerts[chatId][userId][alertType]) {
+  if (activeAlerts[chatId][userId][alertType]) {
     // Ya existe una alerta de este tipo, no hacer nada
     return;
   }
 
   // Implementar la regla de máximo dos alertas activas por usuario, excluyendo TR y HORA_DE_ESPERA
-  const userAlerts = db.data.activeAlerts[chatId][userId];
+  const userAlerts = activeAlerts[chatId][userId];
   const alertCount = Object.keys(userAlerts).filter(type => type !== 'TR' && type !== 'HORA_DE_ESPERA').length;
   if (alertCount >= 2) {
     // Máximo de dos alertas activas alcanzado, enviar mensaje al usuario
-    await bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', { parse_mode: 'Markdown' });
     return;
   }
 
   const message = alertInfo.message;
 
   // Enviar la primera alerta inmediatamente al chat
-  await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).catch(() => {});
-
-  // Guardar la alerta con su tipo y nombre de usuario
-  db.data.activeAlerts[chatId][userId][alertType] = {
-    interval: setInterval(async () => {
-      await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).catch(() => {});
-    }, 20000), // Intervalo fijo de 20 segundos
-    message: message,
-    userName: userName
-  };
-  await db.write();
+  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).then(() => {
+    // Guardar la alerta con su tipo y nombre de usuario
+    activeAlerts[chatId][userId][alertType] = {
+      interval: setInterval(() => {
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).catch(() => {});
+      }, 20000), // Intervalo fijo de 20 segundos
+      message: message,
+      userName: userName
+    };
+  }).catch(() => {});
 }
 
 // Función para manejar alertas programadas para TR y HORA_DE_ESPERA
 function manageTimedAlertGlobal(chatId, alertType, message, delay) {
-  setTimeout(async () => {
-    await db.read(); // Leer la última actualización
-    const chatAlerts = db.data.globalActiveAlerts[chatId] || {};
+  setTimeout(() => {
+    const chatAlerts = globalActiveAlerts[chatId] || {};
     // Verificar si la alerta global no ha sido detenida
     if (chatAlerts[alertType] && chatAlerts[alertType].active) {
-      await bot.sendMessage(chatId, `${message}`, { parse_mode: 'Markdown' }).catch(() => {});
+      bot.sendMessage(chatId, `${message}`, { parse_mode: 'Markdown' }).catch(() => {});
       // Si este es el mensaje final, desactivar la alerta
       if (message.includes('ha finalizado')) {
         delete chatAlerts[alertType];
-        db.data.globalActiveAlerts[chatId] = chatAlerts;
-        await db.write();
+        globalActiveAlerts[chatId] = chatAlerts;
       }
     }
   }, delay);
 }
 
 // Función para detener una alerta específica para un usuario
-async function stopAlertForUser(chatId, targetUserId, alertType) {
-  if (db.data.activeAlerts[chatId] && db.data.activeAlerts[chatId][targetUserId] && db.data.activeAlerts[chatId][targetUserId][alertType]) {
+function stopAlertForUser(chatId, targetUserId, alertType) {
+  if (activeAlerts[chatId] && activeAlerts[chatId][targetUserId] && activeAlerts[chatId][targetUserId][alertType]) {
     // Si es una alerta con intervalos
-    if (db.data.activeAlerts[chatId][targetUserId][alertType].interval) {
-      clearInterval(db.data.activeAlerts[chatId][targetUserId][alertType].interval);
+    if (activeAlerts[chatId][targetUserId][alertType].interval) {
+      clearInterval(activeAlerts[chatId][targetUserId][alertType].interval);
     }
     // Eliminar la alerta
-    delete db.data.activeAlerts[chatId][targetUserId][alertType];
-    await db.write();
+    delete activeAlerts[chatId][targetUserId][alertType];
   }
 }
 
