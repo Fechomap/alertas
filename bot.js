@@ -1,36 +1,34 @@
-// Cargar variables de entorno
+// 1. CONFIGURACIÓN INICIAL
+// 1.1 Importación de dependencias
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const TelegramBot = require('node-telegram-bot-api');
 
-// Crear instancia de Express
+// 1.2 Configuración de Express
 const app = express();
 app.use(bodyParser.json());
 
-// Cargar el token desde las variables de entorno
+// 1.3 Configuración de variables de entorno
 const token = process.env.TELEGRAM_BOT_TOKEN;
+const url = process.env.HEROKU_APP_URL || 'https://chubb-bot-0dd0033c99dc.herokuapp.com';
 
-// URL de tu aplicación en Heroku
-const url = process.env.HEROKU_APP_URL || 'https://chubb-bot-0dd0033c99dc.herokuapp.com'; // Reemplaza con tu URL real
-
-// Crear el bot utilizando webhooks
+// 1.4 Configuración del Bot y Webhook
 const bot = new TelegramBot(token, { webHook: true });
-
-// Definir la ruta del webhook
 const webhookPath = `/bot${token}`;
 bot.setWebHook(`${url}${webhookPath}`);
 
-// IDs de usuarios
-const operatorIds = [7143094298, 7754458578, 7509818905, 8048487029]; // IDs de los operadores que pueden iniciar alertas
-const alertManagerIds = [1022124142, 7758965062, 5660087041, 6330970125]; // IDs de los usuarios que pueden detener alertas
+// 2. ESTRUCTURAS DE DATOS Y VARIABLES GLOBALES
+// 2.1 IDs de usuarios autorizados
+const operatorIds = [7143094298, 7754458578, 7509818905, 8048487029];
+const alertManagerIds = [1022124142, 7758965062, 5660087041, 6330970125];
 
-// Estructuras para almacenar alertas y estados
-let activeAlerts = {}; // Estructura: { chatId: { userId: { alertType: { interval, userName } } } }
-let globalActiveAlerts = {}; // Para alertas TR y HORA_DE_ESPERA por chat
-let userStates = {}; // Estructura: { userId: { chatId, step, data } }
+// 2.2 Estructuras de almacenamiento
+const activeAlerts = {};    // Estructura: { chatId: { userId: { alertType: { interval, userName } } } }
+const globalActiveAlerts = {};  // Para alertas TR y HORA_DE_ESPERA por chat
+const userStates = {};      // Estructura: { userId: { chatId, step, data } }
 
-// Mapeo de alertas
+// 2.3 Definición de tipos de alertas
 const alertTypes = {
   Conferencia: {
     message: '⚠️⚠️ Cabina, por favor apóyame con una conferencia. ¡Gracias! 📞'
@@ -52,7 +50,7 @@ const alertTypes = {
   }
 };
 
-// Mapeo de mensajes de cancelación
+// 2.4 Mensajes de cancelación
 const cancelationMessages = {
   'Conferencia': '🆗🆗 *CONFERENCIA* atendida. 📞 Enseguida le llaman. Alerta desactivada. ¡Gracias! ✔️',
   'Maniobras': '🆗🆗 *MANIOBRAS* atendidas. 🔧 En breve se notificará quién las cubre. Alerta desactivada. ¡Gracias! ✔️',
@@ -62,7 +60,7 @@ const cancelationMessages = {
   'HORA_DE_ESPERA': '🛎️🛎️ *HORA DE ESPERA* completada con éxito. Alerta desactivada. ¡Gracias! ✔️'
 };
 
-// Mapeo de botones a tipos de alerta
+// 2.5 Mapeo de botones a acciones
 const buttonActions = {
   '📞 CONFERENCIA': 'Conferencia',
   '🚗 MANIOBRAS': 'Maniobras',
@@ -72,7 +70,8 @@ const buttonActions = {
   '⏳ HR': 'HORA_DE_ESPERA'
 };
 
-// Funciones para verificar roles
+// 3. FUNCIONES DE UTILIDAD
+// 3.1 Verificación de roles
 function isOperator(userId) {
   return operatorIds.includes(userId);
 }
@@ -81,19 +80,19 @@ function isAlertManager(userId) {
   return alertManagerIds.includes(userId);
 }
 
-// Función para obtener el nombre completo del usuario
+// 3.2 Gestión de información de usuario
 function getUserName(user) {
   const firstName = user.first_name || '';
   const lastName = user.last_name || '';
   return `${firstName} ${lastName}`.trim();
 }
 
-// Función para normalizar texto (eliminar emojis y espacios adicionales)
+// 3.3 Procesamiento de texto
 function normalizeText(text) {
   return text.replace(/[^\p{L}\p{N}\s]/gu, '').trim().toLowerCase();
 }
 
-// Función para enviar el teclado del menú principal
+// 3.4 Interfaz de usuario
 function sendMainMenu(chatId) {
   const keyboard = {
     keyboard: [
@@ -105,66 +104,59 @@ function sendMainMenu(chatId) {
     one_time_keyboard: false
   };
 
-  // Enviar el mensaje con el menú
   bot.sendMessage(chatId, 'Menú principal:', {
     reply_markup: keyboard,
     parse_mode: 'Markdown'
   });
 }
 
-// Manejar el comando /start
+// 4. MANEJADORES DE EVENTOS
+// 4.1 Manejador del comando /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   sendMainMenu(chatId);
 });
 
-// Manejar mensajes y acciones
+// 4.2 Manejador principal de mensajes
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const text = msg.text ? msg.text.trim() : '';
   const from = msg.from;
 
-  // Ignorar mensajes de bots y el comando /start
+  // 4.2.1 Validaciones iniciales
   if (msg.from.is_bot || text === '/start') return;
 
-  // Manejar estados de conversación (e.g., Maniobras)
+  // 4.2.2 Manejo de estados de conversación
   if (userStates[userId] && userStates[userId].chatId === chatId) {
     handleUserState(userId, text, chatId, from);
     return;
   }
 
-  // Verificar si el texto corresponde a una acción
+  // 4.2.3 Procesamiento de acciones de botones
   if (buttonActions[text]) {
     const alertType = buttonActions[text];
     const isOperatorUser = isOperator(userId);
     const isAlertManagerUser = isAlertManager(userId);
 
+    // 4.2.4 Manejo de alertas especiales (TR y HORA_DE_ESPERA)
     if (alertType === 'TR' || alertType === 'HORA_DE_ESPERA') {
-      // Solo alertManagerIds pueden activar estas alertas
       if (isAlertManagerUser) {
         handleAlertManagerAction(alertType, chatId, userId, from);
-      } else {
-        // No hacer nada para operatorIds
-        return;
       }
-    } else {
-      if (isOperatorUser) {
-        handleOperatorAction(alertType, chatId, userId, from);
-      } else if (isAlertManagerUser) {
-        handleAlertManagerDeactivation(alertType, chatId, userId, from);
-      } else {
-        // Usuario sin permisos, no hacer nada
-        return;
-      }
+      return;
     }
-  } else {
-    // Ignorar mensajes no reconocidos
-    return;
+
+    // 4.2.5 Manejo de otras alertas
+    if (isOperatorUser) {
+      handleOperatorAction(alertType, chatId, userId, from);
+    } else if (isAlertManagerUser) {
+      handleAlertManagerDeactivation(alertType, chatId, userId, from);
+    }
   }
 });
 
-// Función para manejar acciones de operatorIds
+// 4.3 Manejador de acciones de operadores
 function handleOperatorAction(alertType, chatId, userId, from) {
   switch (alertType) {
     case 'Conferencia':
@@ -173,7 +165,6 @@ function handleOperatorAction(alertType, chatId, userId, from) {
       startAlert(userId, alertType, chatId, getUserName(from));
       break;
     case 'Maniobras':
-      // Confirmación antes de proceder
       bot.sendMessage(chatId, '🛠️ *Estás iniciando el proceso de solicitud de maniobras, ¿deseas CONTINUAR?*', {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -184,208 +175,166 @@ function handleOperatorAction(alertType, chatId, userId, from) {
       });
       userStates[userId] = { chatId, step: 'confirming_maniobras', data: {} };
       break;
-    default:
-      // Acción desconocida, no hacer nada
-      return;
   }
 }
 
-// Función para manejar acciones de alertManagerIds (TR y HORA_DE_ESPERA)
+// 4.4 Manejador de acciones de managers de alertas
 function handleAlertManagerAction(alertType, chatId, userId, from) {
   const chatAlerts = globalActiveAlerts[chatId] || {};
+  
   switch (alertType) {
     case 'TR':
-      if (chatAlerts['TR']) {
-        // TR ya está activa, no hacer nada
-        return;
+      if (!chatAlerts['TR'] && !chatAlerts['HORA_DE_ESPERA']) {
+        bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 20 minutos para TIEMPO REGLAMENTARIO. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
+        chatAlerts['TR'] = {
+          active: true,
+          userId: userId,
+          userName: getUserName(from)
+        };
+        globalActiveAlerts[chatId] = chatAlerts;
+        manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** Estamos a la mitad del tiempo. 🔔 Si es posible, realiza una conferencia de nuevo.', 600000);
+        manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** El tiempo ha finalizado. ✅', 1200000);
       }
-      if (chatAlerts['HORA_DE_ESPERA']) {
-        // No se puede activar TR si HORA_DE_ESPERA está activa
-        return;
-      }
-      // Enviar mensaje de inicio al grupo
-      bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 20 minutos para TIEMPO REGLAMENTARIO. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
-      // Iniciar alerta de TR
-      chatAlerts['TR'] = {
-        active: true,
-        userId: userId,
-        userName: getUserName(from)
-      };
-      globalActiveAlerts[chatId] = chatAlerts;
-      // Programar mensajes de TR
-      manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** Estamos a la mitad del tiempo. 🔔 Si es posible, realiza una conferencia de nuevo.', 600000); // 10 min
-      manageTimedAlertGlobal(chatId, 'TR', '⏳⏳ **TIEMPO REGLAMENTARIO:** El tiempo ha finalizado. ✅', 1200000); // 20 min
       break;
     case 'HORA_DE_ESPERA':
-      if (chatAlerts['HORA_DE_ESPERA']) {
-        // HORA_DE_ESPERA ya está activa, no hacer nada
-        return;
+      if (!chatAlerts['HORA_DE_ESPERA'] && !chatAlerts['TR']) {
+        bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 60 minutos para la HORA DE ESPERA. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
+        chatAlerts['HORA_DE_ESPERA'] = {
+          active: true,
+          userId: userId,
+          userName: getUserName(from)
+        };
+        globalActiveAlerts[chatId] = chatAlerts;
+        manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** Quedan 15 minutos para que finalice. 🔔 Si es posible, realiza una conferencia de nuevo.', 2700000);
+        manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** El tiempo ha finalizado. ✅', 3600000);
       }
-      if (chatAlerts['TR']) {
-        // No se puede activar HORA_DE_ESPERA si TR está activa
-        return;
-      }
-      // Enviar mensaje de inicio al grupo
-      bot.sendMessage(chatId, '⏰⏰ Se ha iniciado el contador de 60 minutos para la HORA DE ESPERA. ⏳ Se enviarán recordatorios al grupo.', { parse_mode: 'Markdown' });
-      // Iniciar alerta de HORA_DE_ESPERA
-      chatAlerts['HORA_DE_ESPERA'] = {
-        active: true,
-        userId: userId,
-        userName: getUserName(from)
-      };
-      globalActiveAlerts[chatId] = chatAlerts;
-      // Programar mensajes de HORA_DE_ESPERA
-      manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** Quedan 15 minutos para que finalice. 🔔 Si es posible, realiza una conferencia de nuevo.', 2700000); // 45 min
-      manageTimedAlertGlobal(chatId, 'HORA_DE_ESPERA', '⏳⏳ **HORA DE ESPERA:** El tiempo ha finalizado. ✅', 3600000); // 60 min
       break;
-    default:
-      // Acción desconocida, no hacer nada
-      return;
   }
 }
 
-// Función para manejar desactivación de alertas por alertManagerIds
-function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
-  let alertFound = false;
-  if (alertType === 'TR' || alertType === 'HORA_DE_ESPERA') {
-    const chatAlerts = globalActiveAlerts[chatId] || {};
-    if (chatAlerts[alertType]) {
-      delete chatAlerts[alertType];
-      globalActiveAlerts[chatId] = chatAlerts;
-      const message = cancelationMessages[alertType] || `🆗🆗 **ALERTA DE ${alertType.replace(/_/g, ' ')} CANCELADA.**`;
-      // Enviar mensaje de cancelación al grupo
-      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-      alertFound = true;
-    }
-  } else {
-    // Desactivar la alerta si fue activada por un operatorId
-    const chatOperatorsAlerts = activeAlerts[chatId] || {};
-    for (const operatorId of operatorIds) {
-      if (chatOperatorsAlerts[operatorId] && chatOperatorsAlerts[operatorId][alertType]) {
-        stopAlertForUser(chatId, operatorId, alertType);
-        const message = cancelationMessages[alertType] || `🆗🆗 **ALERTA DE ${alertType.replace(/_/g, ' ')} CANCELADA.**`;
-        // Enviar mensaje de cancelación al grupo
-        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-        alertFound = true;
-        break; // Asumiendo que detenemos la primera que encontramos
-      }
-    }
-  }
-  if (!alertFound) {
-    // No hay alerta activa para desactivar, no hacer nada
-    return;
-  }
-}
-
-// Manejar estados de conversación
+// 5. MANEJO DE ESTADOS DE CONVERSACIÓN
+// 5.1 Manejador principal de estados de usuario
 function handleUserState(userId, text, chatId, from) {
   const state = userStates[userId];
-  if (state.chatId !== chatId) {
-    // Ignorar mensajes de otros chats
-    return;
-  }
+  if (state.chatId !== chatId) return;
+  
   const normalizedText = normalizeText(text);
+
+  // 5.1.1 Máquina de estados para el flujo de conversación
   switch (state.step) {
     case 'confirming_maniobras':
-      if (normalizedText === 'continuar' || normalizedText === 'si') {
-        bot.sendMessage(chatId, '🔢 ¿Cuántas maniobras necesita?', {
-          parse_mode: 'Markdown',
-          reply_markup: {
-            remove_keyboard: true
-          }
-        });
-        state.step = 'awaiting_maniobras_quantity';
-      } else if (normalizedText === 'cancelar' || normalizedText === 'no') {
-        // Cancelar y regresar al menú principal
-        delete userStates[userId];
-        sendMainMenu(chatId);
-      } else {
-        bot.sendMessage(chatId, 'Por favor, selecciona una opción válida.', { parse_mode: 'Markdown' });
-      }
+      handleManiobrasConfirmation(normalizedText, chatId, userId);
       break;
     case 'awaiting_maniobras_quantity':
-      const quantity = parseInt(text);
-      if (isNaN(quantity) || quantity <= 0) {
-        bot.sendMessage(chatId, '❌ *Por favor, ingresa un número válido de maniobras.*', { parse_mode: 'Markdown' });
-        return;
-      }
-      state.data.quantity = quantity;
-      state.step = 'awaiting_maniobras_description';
-      bot.sendMessage(chatId, '✏️ Indícame por favor qué maniobras estará realizando.', { parse_mode: 'Markdown' });
+      handleManiobrasQuantity(text, chatId, state);
       break;
     case 'awaiting_maniobras_description':
-      const description = text.trim();
-      if (description.length === 0) {
-        bot.sendMessage(chatId, '❌ *Por favor, ingresa una descripción válida.*', { parse_mode: 'Markdown' });
-        return;
-      }
-      const alertText = `⚠️⚠️ Cabina, se requieren ${state.data.quantity} maniobras. Se realizará: ${description}. Quedo al pendiente de la autorización. ¡Gracias! 🔧`;
-      alertTypes.Maniobras.message = alertText; // Actualizar el mensaje de la alerta MANIOBRAS
-      startAlert(userId, 'Maniobras', chatId, getUserName(from));
-      delete userStates[userId];
-      // Regresar al menú principal
-      sendMainMenu(chatId);
+      handleManiobrasDescription(text, chatId, state, userId, from);
       break;
     default:
       delete userStates[userId];
-      // Estado desconocido, no hacer nada
       return;
   }
 }
 
-// Función para iniciar una alerta
-function startAlert(userId, alertType, chatId, userName) {
-  const alertInfo = alertTypes[alertType];
-  if (!alertInfo) {
-    // Tipo de alerta desconocido, no hacer nada
-    return;
+// 5.2 Manejadores específicos de estados de maniobras
+function handleManiobrasConfirmation(normalizedText, chatId, userId) {
+  if (normalizedText === 'continuar' || normalizedText === 'si') {
+    bot.sendMessage(chatId, '🔢 ¿Cuántas maniobras necesita?', {
+      parse_mode: 'Markdown',
+      reply_markup: { remove_keyboard: true }
+    });
+    userStates[userId].step = 'awaiting_maniobras_quantity';
+  } else if (normalizedText === 'cancelar' || normalizedText === 'no') {
+    delete userStates[userId];
+    sendMainMenu(chatId);
+  } else {
+    bot.sendMessage(chatId, 'Por favor, selecciona una opción válida.', { 
+      parse_mode: 'Markdown' 
+    });
   }
-
-  if (!activeAlerts[chatId]) {
-    activeAlerts[chatId] = {};
-  }
-  if (!activeAlerts[chatId][userId]) {
-    activeAlerts[chatId][userId] = {};
-  }
-
-  // Verificar si la alerta ya está activa
-  if (activeAlerts[chatId][userId][alertType]) {
-    // Ya existe una alerta de este tipo, no hacer nada
-    return;
-  }
-
-  // Implementar la regla de máximo dos alertas activas por usuario, excluyendo TR y HORA_DE_ESPERA
-  const userAlerts = activeAlerts[chatId][userId];
-  const alertCount = Object.keys(userAlerts).filter(type => type !== 'TR' && type !== 'HORA_DE_ESPERA').length;
-  if (alertCount >= 2) {
-    // Máximo de dos alertas activas alcanzado, enviar mensaje al usuario
-    bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', { parse_mode: 'Markdown' });
-    return;
-  }
-
-  const message = alertInfo.message;
-
-  // Enviar la primera alerta inmediatamente al chat
-  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).then(() => {
-    // Guardar la alerta con su tipo y nombre de usuario
-    activeAlerts[chatId][userId][alertType] = {
-      interval: setInterval(() => {
-        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }).catch(() => {});
-      }, 20000), // Intervalo fijo de 20 segundos
-      message: message,
-      userName: userName
-    };
-  }).catch(() => {});
 }
 
-// Función para manejar alertas programadas para TR y HORA_DE_ESPERA
+function handleManiobrasQuantity(text, chatId, state) {
+  const quantity = parseInt(text);
+  if (isNaN(quantity) || quantity <= 0) {
+    bot.sendMessage(chatId, '❌ *Por favor, ingresa un número válido de maniobras.*', {
+      parse_mode: 'Markdown'
+    });
+    return;
+  }
+  state.data.quantity = quantity;
+  state.step = 'awaiting_maniobras_description';
+  bot.sendMessage(chatId, '✏️ Indícame por favor qué maniobras estará realizando.', {
+    parse_mode: 'Markdown'
+  });
+}
+
+function handleManiobrasDescription(text, chatId, state, userId, from) {
+  const description = text.trim();
+  if (description.length === 0) {
+    bot.sendMessage(chatId, '❌ *Por favor, ingresa una descripción válida.*', {
+      parse_mode: 'Markdown'
+    });
+    return;
+  }
+  const alertText = `⚠️⚠️ Cabina, se requieren ${state.data.quantity} maniobras. Se realizará: ${description}. Quedo al pendiente de la autorización. ¡Gracias! 🔧`;
+  alertTypes.Maniobras.message = alertText;
+  startAlert(userId, 'Maniobras', chatId, getUserName(from));
+  delete userStates[userId];
+  sendMainMenu(chatId);
+}
+
+// 6. GESTIÓN DE ALERTAS
+// 6.1 Iniciador de alertas
+function startAlert(userId, alertType, chatId, userName) {
+  const alertInfo = alertTypes[alertType];
+  if (!alertInfo) return;
+
+  // 6.1.1 Inicialización de estructuras de almacenamiento
+  if (!activeAlerts[chatId]) activeAlerts[chatId] = {};
+  if (!activeAlerts[chatId][userId]) activeAlerts[chatId][userId] = {};
+
+  // 6.1.2 Validaciones de alertas existentes
+  if (activeAlerts[chatId][userId][alertType]) return;
+
+  // 6.1.3 Validación de límite de alertas
+  const userAlerts = activeAlerts[chatId][userId];
+  const alertCount = Object.keys(userAlerts)
+    .filter(type => type !== 'TR' && type !== 'HORA_DE_ESPERA')
+    .length;
+    
+  if (alertCount >= 2) {
+    bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', {
+      parse_mode: 'Markdown'
+    });
+    return;
+  }
+
+  // 6.1.4 Envío y programación de alertas
+  const message = alertInfo.message;
+  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+    .then(() => {
+      activeAlerts[chatId][userId][alertType] = {
+        interval: setInterval(() => {
+          bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+            .catch(() => {});
+        }, 20000),
+        message: message,
+        userName: userName
+      };
+    })
+    .catch(() => {});
+}
+
+// 6.2 Gestor de alertas programadas
 function manageTimedAlertGlobal(chatId, alertType, message, delay) {
   setTimeout(() => {
     const chatAlerts = globalActiveAlerts[chatId] || {};
-    // Verificar si la alerta global no ha sido detenida
     if (chatAlerts[alertType] && chatAlerts[alertType].active) {
-      bot.sendMessage(chatId, `${message}`, { parse_mode: 'Markdown' }).catch(() => {});
-      // Si este es el mensaje final, desactivar la alerta
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+        .catch(() => {});
+        
       if (message.includes('ha finalizado')) {
         delete chatAlerts[alertType];
         globalActiveAlerts[chatId] = chatAlerts;
@@ -394,41 +343,71 @@ function manageTimedAlertGlobal(chatId, alertType, message, delay) {
   }, delay);
 }
 
-// Función para detener una alerta específica para un usuario
+// 6.3 Detenedor de alertas
 function stopAlertForUser(chatId, targetUserId, alertType) {
-  if (activeAlerts[chatId] && activeAlerts[chatId][targetUserId] && activeAlerts[chatId][targetUserId][alertType]) {
-    // Si es una alerta con intervalos
+  if (activeAlerts[chatId]?.[targetUserId]?.[alertType]) {
     if (activeAlerts[chatId][targetUserId][alertType].interval) {
       clearInterval(activeAlerts[chatId][targetUserId][alertType].interval);
     }
-    // Eliminar la alerta
     delete activeAlerts[chatId][targetUserId][alertType];
   }
 }
 
-// Manejar errores de polling (ya no se usará polling, pero se puede mantener por seguridad)
+// 6.4 Manejador de desactivación de alertas
+function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
+  let alertFound = false;
+  
+  if (alertType === 'TR' || alertType === 'HORA_DE_ESPERA') {
+    const chatAlerts = globalActiveAlerts[chatId] || {};
+    if (chatAlerts[alertType]) {
+      delete chatAlerts[alertType];
+      globalActiveAlerts[chatId] = chatAlerts;
+      const message = cancelationMessages[alertType];
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+      alertFound = true;
+    }
+  } else {
+    const chatOperatorsAlerts = activeAlerts[chatId] || {};
+    for (const operatorId of operatorIds) {
+      if (chatOperatorsAlerts[operatorId]?.[alertType]) {
+        stopAlertForUser(chatId, operatorId, alertType);
+        const message = cancelationMessages[alertType];
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        alertFound = true;
+        break;
+      }
+    }
+  }
+}
+
+// 7. MANEJO DE ERRORES
+// 7.1 Errores de Polling
 bot.on('polling_error', (error) => {
   console.error('❌ Error de polling:', error);
 });
 
-// Manejar excepciones no capturadas
+// 7.2 Excepciones no capturadas
 process.on('uncaughtException', (err) => {
   console.error('❌ Excepción no capturada:', err);
-  process.exit(1); // Salir del proceso para que Heroku lo reinicie si está en producción
+  // Salir del proceso para que Heroku lo reinicie si está en producción
+  process.exit(1);
 });
 
+// 7.3 Promesas rechazadas no manejadas
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Rechazo de promesa no manejado:', reason);
-  process.exit(1); // Salir del proceso para que Heroku lo reinicie si está en producción
+  // Salir del proceso para que Heroku lo reinicie si está en producción
+  process.exit(1);
 });
 
-// Configurar el webhook en Express para recibir actualizaciones
+// 8. CONFIGURACIÓN DEL SERVIDOR
+// 8.1 Configuración del Webhook
 app.post(webhookPath, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
 
-// Iniciar el servidor Express
+// 8.2 Inicialización del servidor Express
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Bot funcionando en el puerto ${port}`);
