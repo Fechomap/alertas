@@ -28,7 +28,7 @@ const activeAlerts = {};    // Estructura: { chatId: { userId: { alertType: { in
 const globalActiveAlerts = {};  // Para alertas TR y HORA_DE_ESPERA por chat
 const userStates = {};      // Estructura: { userId: { chatId, step, data } }
 
-// 2.3 Definición de tipos de alertas
+// 2.3 Definición de tipos de alertas.
 const alertTypes = {
   Conferencia: {
     message: '⚠️⚠️ Cabina, por favor apóyame con una conferencia. ¡Gracias! 📞'
