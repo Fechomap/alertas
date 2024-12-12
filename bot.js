@@ -22,6 +22,7 @@ bot.setWebHook(`${url}${webhookPath}`);
 // 2.1 IDs de usuarios autorizados
 const operatorIds = [7143094298, 7754458578, 7509818905, 8048487029];
 const alertManagerIds = [1022124142, 7758965062, 5660087041, 6330970125];
+const SUPER_ADMIN_ID = 7143094298;
 
 // 2.2 Estructuras de almacenamiento
 const activeAlerts = {};    // Estructura: { chatId: { userId: { alertType: { interval, userName } } } }
@@ -78,6 +79,10 @@ function isOperator(userId) {
 
 function isAlertManager(userId) {
   return alertManagerIds.includes(userId);
+}
+
+function isSuperAdmin(userId) {
+  return userId === SUPER_ADMIN_ID;
 }
 
 // 3.2 Gestión de información de usuario
@@ -211,6 +216,23 @@ function handleAlertManagerAction(alertType, chatId, userId, from) {
       break;
   }
 }
+
+// 4.5 Manejador del comando cancelar_alertas
+bot.onText(/\/cancelar_alertas/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  
+  if (isSuperAdmin(userId)) {
+    cancelAllAlertsForChat(chatId);
+    bot.sendMessage(chatId, '🔔 *Todas las alertas han sido canceladas por el Superadministrador.*', {
+      parse_mode: 'Markdown'
+    });
+  } else {
+    bot.sendMessage(chatId, '⛔ *No tienes permisos para ejecutar este comando.*', {
+      parse_mode: 'Markdown'
+    });
+  }
+});
 
 // 5. MANEJO DE ESTADOS DE CONVERSACIÓN
 // 5.1 Manejador principal de estados de usuario
@@ -377,6 +399,29 @@ function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
         break;
       }
     }
+  }
+}
+
+// 6.5 Cancelación global de alertas
+function cancelAllAlertsForChat(chatId) {
+  // Cancelar alertas normales
+  if (activeAlerts[chatId]) {
+    Object.keys(activeAlerts[chatId]).forEach(userId => {
+      Object.keys(activeAlerts[chatId][userId]).forEach(alertType => {
+        if (activeAlerts[chatId][userId][alertType].interval) {
+          clearInterval(activeAlerts[chatId][userId][alertType].interval);
+        }
+      });
+    });
+    delete activeAlerts[chatId];
+  }
+
+  // Cancelar alertas globales
+  if (globalActiveAlerts[chatId]) {
+    Object.keys(globalActiveAlerts[chatId]).forEach(alertType => {
+      delete globalActiveAlerts[chatId][alertType];
+    });
+    delete globalActiveAlerts[chatId];
   }
 }
 
