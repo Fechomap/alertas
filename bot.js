@@ -1,4 +1,4 @@
-// 1. CONFIGURACIÓN INICIAL
+// 1. CONFIGURACIÓN INICIAL BOT
 // 1.1 Importación de dependencias
 require('dotenv').config();
 const express = require('express');
