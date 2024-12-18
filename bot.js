@@ -224,7 +224,7 @@ bot.onText(/\/cancelar_alertas/, (msg) => {
   
   if (isSuperAdmin(userId)) {
     cancelAllAlertsForChat(chatId);
-    bot.sendMessage(chatId, '🔔 *Todas las alertas han sido canceladas por el Superadministrador.*', {
+    bot.sendMessage(chatId, '🔔 *Todas las alertas y procesos han sido cancelados por el Administrador.*\n\n_Se ha restablecido el menú principal._', {
       parse_mode: 'Markdown'
     });
   } else {
@@ -404,7 +404,7 @@ function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
 
 // 6.5 Cancelación global de alertas
 function cancelAllAlertsForChat(chatId) {
-  // Cancelar alertas normales
+  // 1. Cancelar alertas normales
   if (activeAlerts[chatId]) {
     Object.keys(activeAlerts[chatId]).forEach(userId => {
       Object.keys(activeAlerts[chatId][userId]).forEach(alertType => {
@@ -416,13 +416,23 @@ function cancelAllAlertsForChat(chatId) {
     delete activeAlerts[chatId];
   }
 
-  // Cancelar alertas globales
+  // 2. Cancelar alertas globales
   if (globalActiveAlerts[chatId]) {
     Object.keys(globalActiveAlerts[chatId]).forEach(alertType => {
       delete globalActiveAlerts[chatId][alertType];
     });
     delete globalActiveAlerts[chatId];
   }
+
+  // 3. Cancelar estados de usuario (procesos como maniobras)
+  Object.keys(userStates).forEach(userId => {
+    if (userStates[userId].chatId === chatId) {
+      delete userStates[userId];
+    }
+  });
+
+  // 4. Restablecer el teclado principal
+  sendMainMenu(chatId);
 }
 
 // 7. MANEJO DE ERRORES
