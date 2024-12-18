@@ -313,15 +313,41 @@ function startAlert(userId, alertType, chatId, userName) {
   const alertInfo = alertTypes[alertType];
   if (!alertInfo) return;
 
+  // Inicialización de estructuras
   if (!activeAlerts[chatId]) activeAlerts[chatId] = {};
   if (!activeAlerts[chatId][userId]) activeAlerts[chatId][userId] = {};
-  
-  // Importante: Si ya existe la alerta, la limpiamos primero
-  if (activeAlerts[chatId][userId][alertType]?.interval) {
-    clearInterval(activeAlerts[chatId][userId][alertType].interval);
-    delete activeAlerts[chatId][userId][alertType];
+
+  // Validación de alerta existente del mismo tipo
+  if (activeAlerts[chatId][userId][alertType]) {
+    return; // Ya existe esta alerta para este usuario
   }
 
+  // Validación del límite de alertas (2 máximo)
+  const userAlerts = activeAlerts[chatId][userId];
+  const alertCount = Object.keys(userAlerts)
+    .filter(type => type !== 'TR' && type !== 'HORA_DE_ESPERA')
+    .length;
+    
+  if (alertCount >= 2) {
+    bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', {
+      parse_mode: 'Markdown'
+    });
+    return;
+  }
+
+  // Validación de alerta del mismo tipo en el chat
+  const hasAlertOfSameType = Object.keys(activeAlerts[chatId]).some(uid => 
+    Object.keys(activeAlerts[chatId][uid]).includes(alertType)
+  );
+
+  if (hasAlertOfSameType) {
+    bot.sendMessage(chatId, `🚫 *Ya existe una alerta activa de ${alertType}.*`, {
+      parse_mode: 'Markdown'
+    });
+    return;
+  }
+
+  // Si pasa todas las validaciones, entonces creamos la alerta
   const message = alertInfo.message;
   let intervalId;
 
