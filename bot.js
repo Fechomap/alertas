@@ -313,56 +313,68 @@ function startAlert(userId, alertType, chatId, userName) {
   const alertInfo = alertTypes[alertType];
   if (!alertInfo) return;
 
-  // 6.1.1 Inicialización de estructuras de almacenamiento
   if (!activeAlerts[chatId]) activeAlerts[chatId] = {};
   if (!activeAlerts[chatId][userId]) activeAlerts[chatId][userId] = {};
-
-  // 6.1.2 Validaciones de alertas existentes
-  if (activeAlerts[chatId][userId][alertType]) return;
-
-  // 6.1.3 Validación de límite de alertas
-  const userAlerts = activeAlerts[chatId][userId];
-  const alertCount = Object.keys(userAlerts)
-    .filter(type => type !== 'TR' && type !== 'HORA_DE_ESPERA')
-    .length;
-    
-  if (alertCount >= 2) {
-    bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', {
-      parse_mode: 'Markdown'
-    });
-    return;
+  
+  // Importante: Si ya existe la alerta, la limpiamos primero
+  if (activeAlerts[chatId][userId][alertType]?.interval) {
+    clearInterval(activeAlerts[chatId][userId][alertType].interval);
+    delete activeAlerts[chatId][userId][alertType];
   }
 
-  // 6.1.4 Envío y programación de alertas
   const message = alertInfo.message;
+  let intervalId;
+
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
     .then(() => {
+      intervalId = setInterval(() => {
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+          .catch(error => {
+            console.error(`Error en intervalo: ${error}`);
+            clearInterval(intervalId);
+            delete activeAlerts[chatId][userId][alertType];
+          });
+      }, 20000);
+
       activeAlerts[chatId][userId][alertType] = {
-        interval: setInterval(() => {
-          bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
-            .catch(() => {});
-        }, 20000),
+        interval: intervalId,
         message: message,
         userName: userName
       };
     })
-    .catch(() => {});
+    .catch(error => {
+      console.error(`Error iniciando alerta: ${error}`);
+      if (intervalId) clearInterval(intervalId);
+    });
 }
 
 // 6.2 Gestor de alertas programadas
 function manageTimedAlertGlobal(chatId, alertType, message, delay) {
-  setTimeout(() => {
-    const chatAlerts = globalActiveAlerts[chatId] || {};
-    if (chatAlerts[alertType] && chatAlerts[alertType].active) {
+  if (!globalActiveAlerts[chatId]) globalActiveAlerts[chatId] = {};
+  
+  // Si ya existe una alerta de este tipo, la limpiamos
+  if (globalActiveAlerts[chatId][alertType]) {
+    if (globalActiveAlerts[chatId][alertType].timeoutId) {
+      clearTimeout(globalActiveAlerts[chatId][alertType].timeoutId);
+    }
+  }
+
+  const timeoutId = setTimeout(() => {
+    if (globalActiveAlerts[chatId]?.[alertType]?.active) {
       bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
-        .catch(() => {});
+        .catch(error => console.error(`Error en alerta global: ${error}`));
         
       if (message.includes('ha finalizado')) {
-        delete chatAlerts[alertType];
-        globalActiveAlerts[chatId] = chatAlerts;
+        delete globalActiveAlerts[chatId][alertType];
       }
     }
   }, delay);
+
+  // Guardamos el timeoutId para poder cancelarlo después
+  if (!globalActiveAlerts[chatId][alertType]) {
+    globalActiveAlerts[chatId][alertType] = {};
+  }
+  globalActiveAlerts[chatId][alertType].timeoutId = timeoutId;
 }
 
 // 6.3 Detenedor de alertas
@@ -404,7 +416,7 @@ function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
 
 // 6.5 Cancelación global de alertas
 function cancelAllAlertsForChat(chatId) {
-  // 1. Cancelar alertas normales
+  // 1. Limpiar alertas normales
   if (activeAlerts[chatId]) {
     Object.keys(activeAlerts[chatId]).forEach(userId => {
       Object.keys(activeAlerts[chatId][userId]).forEach(alertType => {
@@ -416,22 +428,24 @@ function cancelAllAlertsForChat(chatId) {
     delete activeAlerts[chatId];
   }
 
-  // 2. Cancelar alertas globales
+  // 2. Limpiar alertas globales (TR y HORA_DE_ESPERA)
   if (globalActiveAlerts[chatId]) {
     Object.keys(globalActiveAlerts[chatId]).forEach(alertType => {
-      delete globalActiveAlerts[chatId][alertType];
+      if (globalActiveAlerts[chatId][alertType].timeoutId) {
+        clearTimeout(globalActiveAlerts[chatId][alertType].timeoutId);
+      }
     });
     delete globalActiveAlerts[chatId];
   }
 
-  // 3. Cancelar estados de usuario (procesos como maniobras)
+  // 3. Limpiar estados de usuario (como el proceso de maniobras)
   Object.keys(userStates).forEach(userId => {
     if (userStates[userId].chatId === chatId) {
       delete userStates[userId];
     }
   });
 
-  // 4. Restablecer el teclado principal
+  // 4. Restaurar menú principal
   sendMainMenu(chatId);
 }
 
