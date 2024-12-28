@@ -44,7 +44,7 @@ const alertTypes = {
     message: '' // TR tiene alertas programadas
   },
   HORA_DE_ESPERA: {
-    message: '' // HORA_DE_ESPERA tiene alertas programadas
+    message: '' // HORA_DE_ESPERA tiene alertas programadas.
   },
   VALIDACION_DE_ORIGEN: {
     message: '⚠️⚠️ Cabina, por favor apóyame con la validación del origen. ¡Gracias! 📍'
