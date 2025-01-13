@@ -218,17 +218,24 @@ function handleAlertManagerAction(alertType, chatId, userId, from) {
 }
 
 // 4.5 Manejador del comando cancelar_alertas
-bot.onText(/\/cancelar_alertas/, (msg) => {
+bot.onText(/\/cancelar_alertas/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   
   if (isSuperAdmin(userId)) {
-    cancelAllAlertsForChat(chatId);
-    bot.sendMessage(chatId, '🔔 *Todas las alertas y procesos han sido cancelados por el Administrador.*\n\n_Se ha restablecido el menú principal._', {
-      parse_mode: 'Markdown'
-    });
+    const success = cancelAllAlertsForChat(chatId);
+    if (success) {
+      await bot.sendMessage(chatId, '🔔 *Todas las alertas y procesos han sido cancelados por el Administrador.*', {
+        parse_mode: 'Markdown'
+      });
+      setTimeout(() => sendMainMenu(chatId), 500);
+    } else {
+      await bot.sendMessage(chatId, '❌ *Error al cancelar las alertas. Por favor, intente de nuevo.*', {
+        parse_mode: 'Markdown'
+      });
+    }
   } else {
-    bot.sendMessage(chatId, '⛔ *No tienes permisos para ejecutar este comando.*', {
+    await bot.sendMessage(chatId, '⛔ *No tienes permisos para ejecutar este comando.*', {
       parse_mode: 'Markdown'
     });
   }
@@ -469,91 +476,92 @@ function handleAlertManagerDeactivation(alertType, chatId, userId, from) {
 // 6.5 Cancelación global de alertas
 function cancelAllAlertsForChat(chatId) {
   try {
-    // 1. Limpiar alertas normales con verificación adicional
+    // 1. Limpiar alertas normales
     if (activeAlerts[chatId]) {
-      Object.keys(activeAlerts[chatId]).forEach(userId => {
-        Object.keys(activeAlerts[chatId][userId] || {}).forEach(alertType => {
-          try {
-            if (activeAlerts[chatId][userId][alertType]?.interval) {
-              clearInterval(activeAlerts[chatId][userId][alertType].interval);
-            }
-          } catch (error) {
-            console.error(`Error al limpiar intervalo para ${chatId}/${userId}/${alertType}:`, error);
+      for (const userId in activeAlerts[chatId]) {
+        for (const alertType in activeAlerts[chatId][userId]) {
+          const alert = activeAlerts[chatId][userId][alertType];
+          if (alert && alert.interval) {
+            clearInterval(alert.interval);
           }
-        });
-      });
+        }
+      }
       delete activeAlerts[chatId];
     }
 
-    // 2. Limpiar alertas globales con verificación adicional
+    // 2. Limpiar alertas globales
     if (globalActiveAlerts[chatId]) {
-      Object.keys(globalActiveAlerts[chatId]).forEach(alertType => {
-        try {
-          if (globalActiveAlerts[chatId][alertType]?.timeoutId) {
-            clearTimeout(globalActiveAlerts[chatId][alertType].timeoutId);
+      for (const alertType in globalActiveAlerts[chatId]) {
+        const alert = globalActiveAlerts[chatId][alertType];
+        if (alert) {
+          if (alert.timeoutId) {
+            clearTimeout(alert.timeoutId);
           }
-          if (globalActiveAlerts[chatId][alertType]?.active) {
-            globalActiveAlerts[chatId][alertType].active = false;
+          if (alert.active) {
+            alert.active = false;
           }
-        } catch (error) {
-          console.error(`Error al limpiar timeout global para ${chatId}/${alertType}:`, error);
         }
-      });
+      }
       delete globalActiveAlerts[chatId];
     }
 
     // 3. Limpiar estados de usuario
-    Object.keys(userStates).forEach(userId => {
-      if (userStates[userId]?.chatId === chatId) {
+    for (const userId in userStates) {
+      if (userStates[userId] && userStates[userId].chatId === chatId) {
         delete userStates[userId];
       }
-    });
+    }
 
-    // 4. Restaurar menú principal y enviar confirmación
-    sendMainMenu(chatId);
+    return true;
   } catch (error) {
     console.error('Error en cancelAllAlertsForChat:', error);
-    bot.sendMessage(chatId, '❌ *Error al cancelar alertas*\n_Por favor, contacte al administrador._', {
-      parse_mode: 'Markdown'
-    }).catch(() => {});
+    return false;
   }
 }
 
 // 6.6 Comando de emergencia (Nuevo)
-bot.onText(/\/emergencia/, (msg) => {
+bot.onText(/\/emergencia/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   
   if (isSuperAdmin(userId) || isOperator(userId)) {
     try {
-      // Forzar limpieza completa de todas las estructuras
-      if (activeAlerts[chatId]) {
-        delete activeAlerts[chatId];
-      }
-      if (globalActiveAlerts[chatId]) {
-        delete globalActiveAlerts[chatId];
-      }
+      // Forzar limpieza completa y reinicio
+      const success = cancelAllAlertsForChat(chatId);
       
-      // Limpiar estados de usuario
-      Object.keys(userStates).forEach(uid => {
-        if (userStates[uid]?.chatId === chatId) {
-          delete userStates[uid];
+      if (success) {
+        // Forzar limpieza adicional de variables globales
+        for (const key in activeAlerts) {
+          if (activeAlerts[key]) {
+            delete activeAlerts[key];
+          }
         }
-      });
+        for (const key in globalActiveAlerts) {
+          if (globalActiveAlerts[key]) {
+            delete globalActiveAlerts[key];
+          }
+        }
+        for (const key in userStates) {
+          if (userStates[key]) {
+            delete userStates[key];
+          }
+        }
 
-      bot.sendMessage(chatId, '🚨 *REINICIO DE EMERGENCIA COMPLETADO*\n_Se han eliminado todas las alertas y estados._', {
-        parse_mode: 'Markdown'
-      }).then(() => {
-        sendMainMenu(chatId);
-      });
+        await bot.sendMessage(chatId, '🚨 *REINICIO DE EMERGENCIA COMPLETADO*\n_Se han eliminado todas las alertas y estados._', {
+          parse_mode: 'Markdown'
+        });
+        setTimeout(() => sendMainMenu(chatId), 500);
+      } else {
+        throw new Error('Falló la limpieza de alertas');
+      }
     } catch (error) {
       console.error('Error en comando de emergencia:', error);
-      bot.sendMessage(chatId, '❌ *Error en reinicio de emergencia*\n_Por favor, contacte al administrador._', {
+      await bot.sendMessage(chatId, '❌ *Error en reinicio de emergencia*\n_Por favor, contacte al administrador._', {
         parse_mode: 'Markdown'
-      }).catch(() => {});
+      });
     }
   } else {
-    bot.sendMessage(chatId, '⛔ *No tienes permisos para ejecutar este comando.*', {
+    await bot.sendMessage(chatId, '⛔ *No tienes permisos para ejecutar este comando.*', {
       parse_mode: 'Markdown'
     });
   }
