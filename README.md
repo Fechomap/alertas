@@ -1,171 +1,182 @@
-# Bot de Maniobras y Alertas
+# Bot de Soporte Telegram
 
-Bot de Telegram para gestión de maniobras y sistema de alertas. Permite el registro de maniobras, generación de reportes y manejo de alertas para diferentes grupos.
+Bot de Telegram para gestión de alertas y maniobras en grupos de soporte.
 
-## Características
+## Descripción
 
-- Sistema de alertas con repetición automática
-- Registro de maniobras con validación
-- Reportes semanales
-- Exportación/Importación de datos
-- Sistema de nombres personalizados para grupos
+Este bot permite a operadores enviar alertas a grupos de Telegram y a los gestores de alertas (Alert Managers) cancelar esas alertas y registrar maniobras. El sistema también incluye generación de reportes y gestión de grupos.
 
 ## Requisitos
 
-- Node.js v14 o superior
+- Node.js 14.x o superior
 - MongoDB
-- npm o yarn
+- Cuenta de Telegram
+- Token de bot de Telegram (obtenido a través de BotFather)
+- Cuenta en Heroku (para despliegue en producción)
+
+## Variables de Entorno
+
+Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
+
+```
+TELEGRAM_BOT_TOKEN=tu_token_de_telegram_aquí
+MONGO_URI=tu_uri_de_mongodb_aquí
+NODE_ENV=development
+HEROKU_APP_URL=https://tu-app-en-heroku.herokuapp.com
+```
 
 ## Instalación
 
-1. Clonar el repositorio:
 ```bash
-git clone <url-del-repositorio>
-cd bot-maniobras
-```
+# Clonar el repositorio
+git clone https://github.com/tu-usuario/bot-soporte.git
+cd bot-soporte
 
-2. Instalar dependencias:
-```bash
+# Instalar dependencias
 npm install
 ```
 
-3. Configurar variables de entorno:
-Crear archivo `.env` con:
-```env
-TELEGRAM_BOT_TOKEN=your_token_here
-MONGO_URI=your_mongodb_uri
-NODE_ENV=development
+## Estructura del Proyecto
+
+```
+/
+├── src/                    # Código fuente principal
+│   ├── index.js            # Punto de entrada
+│   ├── config/             # Configuración 
+│   │   ├── index.js        # Exporta toda la configuración
+│   │   ├── database.js     # Configuración de MongoDB
+│   │   └── constants.js    # Constantes (IDs, tipos de alertas, etc.)
+│   ├── models/             # Modelos de datos
+│   │   ├── index.js        # Exporta todos los modelos
+│   │   ├── maniobra.js     # Modelo de maniobra
+│   │   └── group.js        # Modelo de grupo
+│   ├── services/           # Servicios y lógica de negocio
+│   │   ├── alert.js        # Manejo de alertas
+│   │   └── maniobra.js     # Manejo de maniobras
+│   ├── utils/              # Funciones de utilidad
+│   │   ├── index.js        # Exporta todas las utilidades
+│   │   └── permissions.js  # Verificación de permisos
+│   ├── handlers/           # Manejadores de comandos y mensajes
+│   │   ├── index.js        # Exporta todos los manejadores
+│   │   ├── commands.js     # Manejo de comandos (/start, etc.)
+│   │   └── messages.js     # Manejo de mensajes de texto
+│   └── ui/                 # Interfaz de usuario
+│       └── keyboards.js    # Definición de teclados personalizados
+├── scripts/                # Scripts utilitarios
+│   ├── clearDatabase.js    # Limpiar base de datos
+│   ├── exportData.js       # Exportar datos
+│   └── importData.js       # Importar datos
+├── .env                    # Variables de entorno
+├── package.json            # Dependencias y scripts
 ```
 
-## Uso
+## Comandos
 
-### Comandos del Bot
-
-- `/start` - Inicia el bot y muestra el menú principal
-- `/report` - Genera reporte semanal de maniobras (solo Alert Managers)
-- `/cancelar_alertas` - Cancela todas las alertas activas (solo Super Admin)
-- `/restart` - Reinicia el bot (solo Super Admin)
-
-### Scripts de Utilidad
-
-Los scripts se encuentran en la carpeta `/scripts` y permiten gestionar la base de datos:
-
-#### Exportar Datos
 ```bash
-node scripts/exportData.js
-```
-- Genera archivo `data.xlsx` en la carpeta scripts
-- Contiene dos hojas:
-  - "Maniobras": Registro completo de maniobras
-  - "Grupos": IDs de grupos y sus nombres personalizados
+# Desarrollo local (con auto-recarga)
+npm run dev
 
-#### Importar Datos
+# Iniciar en producción
+npm start
+
+# Exportar datos a Excel
+npm run export
+
+# Importar datos desde Excel
+npm run import
+
+# Limpiar base de datos
+npm run clear-db
+```
+
+## Gestión en Heroku
+
+### Configuración de Heroku
+
+Asegúrate de tener instalada la CLI de Heroku y estar autenticado:
+
 ```bash
-node scripts/importData.js
-```
-- Lee `data.xlsx` de la carpeta scripts
-- Actualiza la base de datos con la información del Excel
-- Requiere formato específico en el Excel
+# Instalar CLI de Heroku (si no la tienes)
+brew install heroku/brew/heroku  # macOS con Homebrew
+# o
+npm install -g heroku            # Con npm
 
-#### Limpiar Base de Datos
+# Autenticar
+heroku login
+```
+
+### Comandos de Gestión para la Aplicación
+
 ```bash
-node scripts/clearDatabase.js
+# Ver información de la aplicación
+heroku apps:info -a alertas
+
+# Ver logs en tiempo real
+heroku logs --tail -a alertas
+
+# Reiniciar la aplicación
+heroku restart -a alertas
+
+# Escalar dynos (cambiar el número de instancias)
+heroku ps:scale web=1 -a alertas
+
+# Detener la aplicación (escalar a 0)
+heroku ps:scale web=0 -a alertas
+
+# Iniciar la aplicación (escalar a 1 o más)
+heroku ps:scale web=1 -a alertas
+
+# Ver variables de configuración
+heroku config -a alertas
+
+# Establecer una variable de configuración
+heroku config:set NOMBRE_VARIABLE=valor -a alertas
+
+# Eliminar una variable de configuración
+heroku config:unset NOMBRE_VARIABLE -a alertas
 ```
-- Elimina todos los registros de la base de datos
-- Requiere confirmación explícita escribiendo "CONFIRMAR"
 
-## Estructura de Datos
+### Gestión de Despliegue
 
-### Maniobras
-```javascript
-{
-  chatId: String,         // ID del grupo
-  groupName: String,      // Nombre del grupo
-  alertManagerId: Number, // ID del Alert Manager
-  maniobras: Number,      // Cantidad (1-10)
-  descripcion: String,    // Descripción
-  fecha: Date            // Fecha de registro
-}
+```bash
+# Desplegar cambios (después de hacer commit)
+git push heroku main
+
+# Ejecutar comando en el servidor
+heroku run npm run comando -a alertas
+
+# Abrir la aplicación en el navegador
+heroku open -a alertas
 ```
 
-### Grupos
-```javascript
-{
-  chatId: String,         // ID del grupo
-  displayName: String     // Nombre personalizado
-}
-```
+## Variables de Configuración Actuales
 
-## Roles de Usuario
+- **APP_URL**: https://alertas-5f770ceb3390.herokuapp.com
+- **HEROKU_APP_URL**: https://alertas-5f770ceb3390.herokuapp.com
+- **WEBHOOK_URL**: https://alertas-5f770ceb3390.herokuapp.com
 
-- **Super Admin**: Control total del sistema
-- **Alert Managers**: Pueden registrar maniobras y ver reportes
-- **Operadores**: Pueden iniciar alertas
+## Seguridad
 
-## Flujo de Trabajo para Maniobras
-
-1. Alert Manager selecciona "🚗 MANIOBRAS"
-2. Ingresa cantidad (1-10)
-3. Confirma el registro
-4. Sistema guarda la maniobra y muestra confirmación
-
-## Flujo de Trabajo para Alertas
-
-1. Operador selecciona tipo de alerta
-2. Sistema inicia alerta con repetición cada 20 segundos
-3. Alert Manager puede cancelar la alerta
-4. Sistema confirma cancelación
+- Los IDs de usuarios con permisos especiales están definidos en `src/config/constants.js`
+- Las credenciales de MongoDB y el token del bot deben mantenerse seguros
+- Nunca compartas tus tokens o credenciales en repositorios públicos
 
 ## Mantenimiento
 
-### Respaldo de Datos
-Se recomienda exportar datos regularmente:
-```bash
-node scripts/exportData.js
-```
+Para mantener el servicio funcionando correctamente:
 
-### Actualización de Nombres de Grupos
-1. Exportar datos actuales
-2. Modificar nombres en hoja "Grupos"
-3. Importar datos actualizados
+1. Monitorea regularmente los logs con `heroku logs --tail -a alertas`
+2. Realiza backups periódicos usando `npm run export`
+3. Revisa que la aplicación esté activa con `heroku ps -a alertas`
 
-## Solución de Problemas
+## Problemas Comunes
 
-### Error de Conexión MongoDB
-- Verificar MONGO_URI en variables de entorno
-- Confirmar acceso a la base de datos
-
-### Alertas no se Cancelan
-- Usar `/cancelar_alertas` como Super Admin
-- Reiniciar bot si persiste
-
-## Deployment
-
-### Heroku
-1. Configurar variables de entorno:
-```bash
-heroku config:set TELEGRAM_BOT_TOKEN="your_token"
-heroku config:set MONGO_URI="your_mongodb_uri"
-heroku config:set NODE_ENV="production"
-```
-
-2. Deploy:
-```bash
-git push heroku main
-```
-
-## Contribuir
-
-1. Fork del repositorio
-2. Crear branch (`git checkout -b feature/mejora`)
-3. Commit cambios (`git commit -am 'feat: nueva mejora'`)
-4. Push al branch (`git push origin feature/mejora`)
-5. Crear Pull Request
+Si el bot deja de responder:
+1. Verifica los logs: `heroku logs --tail -a alertas`
+2. Reinicia la aplicación: `heroku restart -a alertas`
+3. Asegúrate de que los dynos estén activos: `heroku ps -a alertas`
+4. Comprueba la conectividad con MongoDB y Telegram
 
 ## Licencia
 
 ISC
-
-## Autor
-
-Nombre del Autor

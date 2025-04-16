@@ -1,7 +1,7 @@
-// clearDatabase.js
+require('dotenv').config();
 const mongoose = require('mongoose');
-const config = require('./config');
 const readline = require('readline');
+const { Maniobra } = require('../src/models');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -10,10 +10,11 @@ const rl = readline.createInterface({
 
 async function clearDatabase() {
   try {
-    await mongoose.connect(config.mongoUri);
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
     console.log('Conectado a MongoDB');
-
-    const Maniobra = mongoose.model('Maniobra', config.maniobraSchema);
 
     rl.question('¿Estás seguro de que quieres borrar TODOS los datos? (escribe "CONFIRMAR" para proceder): ', async (answer) => {
       if (answer === 'CONFIRMAR') {

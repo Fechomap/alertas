@@ -1,9 +1,13 @@
 {
   "name": "bot-soporte",
   "version": "1.0.0",
-  "main": "bot.js",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node bot.js",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "export": "node scripts/exportData.js",
+    "import": "node scripts/importData.js",
+    "clear-db": "node scripts/clearDatabase.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -12,11 +16,13 @@
   "dependencies": {
     "body-parser": "^1.20.3",
     "dotenv": "^16.4.7",
-    "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "mongodb": "^6.13.0",
     "mongoose": "^8.10.1",
     "node-telegram-bot-api": "^0.66.0",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }

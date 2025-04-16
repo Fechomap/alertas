@@ -1,18 +1,18 @@
-// importData.js
+require('dotenv').config();
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
 const path = require('path');
-const config = require('./config');
+const { Maniobra, Group } = require('../src/models');
 
 async function importFromExcel() {
   try {
-    await mongoose.connect(config.mongoUri);
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
     console.log('Conectado a MongoDB');
-
-    const Maniobra = mongoose.model('Maniobra', config.maniobraSchema);
-    const Group = mongoose.model('Group', config.groupSchema);
     
-    // Leer archivo Excel desde la carpeta scripts
+    // Leer archivo Excel
     const filename = path.join(__dirname, 'data.xlsx');
     console.log('Intentando leer:', filename);
     
