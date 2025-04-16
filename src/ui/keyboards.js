@@ -53,8 +53,20 @@ function getConfirmationKeyboard() {
   };
 }
 
+// Create a persistent keyboard with a Start button
+function getPersistentKeyboard() {
+  return {
+    keyboard: [
+      [{ text: '🏠 Menú Principal' }]
+    ],
+    resize_keyboard: true,
+    persistent: true
+  };
+}
+
 module.exports = {
   getMainMenuKeyboard,
   getApoyoMenuKeyboard,
-  getConfirmationKeyboard
+  getConfirmationKeyboard,
+  getPersistentKeyboard
 };

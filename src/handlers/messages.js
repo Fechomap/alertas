@@ -60,8 +60,18 @@ function setupMessageHandlers(bot) {
     }
 
     // If the message was not handled by maniobras state, 
-    // you could add logic here for other text commands or general messages.
-    // For now, we'll just log it if it wasn't part of maniobras.
+    // check if it's from the persistent keyboard button
+    if (text === '🏠 Menú Principal') {
+      console.log('🏠 Botón de Menú Principal presionado, simulando /start');
+      // Clear any pending states
+      const { clearUserStates } = require('../services/maniobra');
+      clearUserStates(chatId);
+      // Send the main menu (same behavior as /start command)
+      sendMainMenu(bot, chatId);
+      return;
+    }
+    
+    // Log unhandled messages
     console.log(`💬 Mensaje de texto no procesado por otros handlers: "${text}"`);
     
     // Example: Respond to unknown text messages
