@@ -6,21 +6,43 @@ const activeAlerts = {};
 
 function startAlert(bot, userId, alertType, chatId, userName) {
   try {
+    console.log(`🔔 Iniciando alerta: Tipo=${alertType}, Usuario=${userId}, Chat=${chatId}`);
     const alertInfo = alertTypes[alertType];
-    if (!alertInfo) return;
-
-    if (!activeAlerts[chatId]) activeAlerts[chatId] = {};
-    if (!activeAlerts[chatId][userId]) activeAlerts[chatId][userId] = {};
-
-    if (activeAlerts[chatId][userId][alertType]?.interval) {
-      clearInterval(activeAlerts[chatId][userId][alertType].interval);
-      delete activeAlerts[chatId][userId][alertType];
+    if (!alertInfo) {
+      console.error(`❌ Tipo de alerta desconocido: ${alertType}`);
+      return;
     }
 
+    // --- Robustness Checks ---
+    // Ensure chatId level exists
+    if (!activeAlerts[chatId]) {
+      console.log(`🔧 Inicializando activeAlerts para chatId: ${chatId}`);
+      activeAlerts[chatId] = {};
+    }
+    // Ensure userId level exists within chatId
+    if (!activeAlerts[chatId][userId]) {
+      console.log(`🔧 Inicializando activeAlerts[${chatId}] para userId: ${userId}`);
+      activeAlerts[chatId][userId] = {};
+    }
+    // --- End Robustness Checks ---
+
+    // Check if this specific alert type is already active for the user
+    if (activeAlerts[chatId]?.[userId]?.[alertType]?.interval) {
+      console.log(`🔄 Reiniciando alerta existente: Tipo=${alertType}, Usuario=${userId}`);
+      clearInterval(activeAlerts[chatId][userId][alertType].interval);
+      // No need to delete here, it will be overwritten below
+    }
+
+    // Check maximum active alerts *after* potentially clearing an existing one
     const userAlerts = activeAlerts[chatId][userId];
-    if (Object.keys(userAlerts).length >= 2) {
+    // Count only alerts that still have an interval (might be redundant now, but safe)
+    const activeCount = Object.values(userAlerts).filter(alert => alert?.interval).length; 
+    
+    // Allow replacing an existing alert even if at max capacity
+    if (activeCount >= 2 && !activeAlerts[chatId]?.[userId]?.[alertType]) { 
+      console.log(`🚫 Usuario ${userId} ya tiene ${activeCount} alertas activas.`);
       bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', { parse_mode: 'Markdown' });
-      return;
+      return; // Stop if max reached and not replacing existing
     }
 
     const message = alertInfo.message;

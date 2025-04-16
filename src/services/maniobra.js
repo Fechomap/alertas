@@ -103,12 +103,14 @@ async function handleManiobrasState(bot, userId, text, chatId) {
         return false;
     }
   } catch (error) {
-    console.error('Error en handleManiobrasState:', error);
-    bot.sendMessage(chatId, '❌ *Ocurrió un error al procesar tu solicitud. Por favor, intenta nuevamente.*', {
+    console.error('❌ Error en handleManiobrasState:', error);
+    bot.sendMessage(chatId, '❌ *Ocurrió un error interno al procesar el estado de maniobras. Por favor, intenta nuevamente.*', {
       parse_mode: 'Markdown'
     });
-    delete userStates[userId];
-    return true;
+    // Clear the state on error to prevent getting stuck
+    delete userStates[userId]; 
+    // Return false because the message was NOT successfully handled by the state machine
+    return false; 
   }
 }
 

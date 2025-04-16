@@ -4,30 +4,26 @@ const alertManagerIds = [7143094298, 1022124142, 7758965062, 5660087041, 6330970
 const SUPER_ADMIN_ID = 7143094298;
 
 // Tipos de alertas y mensajes
+// Only keep Conferencia alert type
 const alertTypes = {
   Conferencia: {
     message: '⚠️⚠️ Cabina, por favor apóyame con una conferencia. ¡Gracias! 📞'
-  },
-  USUARIO_NO_ESTA_EN_VH: {
-    message: '⚠️⚠️ Cabina, por favor apóyame avisando al usuario que salga. ¡Gracias! 🚗'
-  },
-  VALIDACION_DE_ORIGEN: {
-    message: '⚠️⚠️ Cabina, por favor apóyame con la validación del origen. ¡Gracias! 📍'
   }
+  // Removed USUARIO_NO_ESTA_EN_VH and VALIDACION_DE_ORIGEN
 };
 
+// Remove unused button actions
 const buttonActions = {
   '🤝 APOYO': 'APOYO',
   '🚗 MANIOBRAS': 'Maniobras',
-  '📞 CONFERENCIA': 'Conferencia',
-  '🚫 NA NO ESTA EN VH': 'USUARIO_NO_ESTA_EN_VH',
-  '🔍 VALIDAR ORIGEN': 'VALIDACION_DE_ORIGEN'
+  '📞 CONFERENCIA': 'Conferencia'
+  // Removed '🚫 NA NO ESTA EN VH' and '🔍 VALIDAR ORIGEN'
 };
 
+// Remove unused cancellation messages
 const cancelationMessages = {
-  'Conferencia': '🆗🆗 *CONFERENCIA* atendida. 📞 Enseguida le llaman. Alerta desactivada. ¡Gracias! ✔️',
-  'USUARIO_NO_ESTA_EN_VH': '🆗🆗 Se está gestionando el contacto con el usuario para que salga. 📞 Alerta desactivada. ¡Gracias! ✔️',
-  'VALIDACION_DE_ORIGEN': '🆗🆗 Se está gestionando el contacto con el usuario para verificar su ubicación. 📞 Alerta desactivada. ¡Gracias! ✔️'
+  'Conferencia': '🆗🆗 *CONFERENCIA* atendida. 📞 Enseguida le llaman. Alerta desactivada. ¡Gracias! ✔️'
+  // Removed messages for USUARIO_NO_ESTA_EN_VH and VALIDACION_DE_ORIGEN
 };
 
 module.exports = {
