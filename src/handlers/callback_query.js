@@ -44,13 +44,14 @@ function setupCallbackQueryHandlers(bot) {
         const handled = await handleManiobrasState(bot, userId, simulatedText, chatId);
         if (handled) {
           console.log('✅ Confirmación de maniobras procesada por handleManiobrasState');
-          // Optionally edit the confirmation message away or send main menu again
-           bot.editMessageText('Acción de maniobra completada.', { // Edit the confirmation message
+          // Edit the confirmation message with a success message but don't return to main menu
+           bot.editMessageText('✅ *Maniobra registrada correctamente.*\n\nPuedes usar el botón "🏠 Menú Principal" para volver al menú principal cuando lo necesites.', { 
              chat_id: chatId,
              message_id: message.message_id,
-             reply_markup: null // Remove buttons
+             reply_markup: null, // Remove buttons
+             parse_mode: 'Markdown'
            }).catch(err => console.error("Error editando mensaje post-maniobra:", err));
-           setTimeout(() => sendMainMenu(bot, chatId), 500); // Send main menu separately
+           // No longer automatically returning to main menu to keep the persistent keyboard visible
           return;
         } else {
            console.log('⚠️ Confirmación de maniobras no procesada por handleManiobrasState');

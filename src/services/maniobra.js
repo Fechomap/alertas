@@ -22,9 +22,10 @@ function startManiobrasFlow(bot, chatId, userId) {
     return false;
   }
 
+  // Don't remove the persistent keyboard when starting the maniobras flow
   bot.sendMessage(chatId, '🔢 *¿Cuántas maniobras autorizadas? (1-10)*', {
-    parse_mode: 'Markdown',
-    reply_markup: { remove_keyboard: true }
+    parse_mode: 'Markdown'
+    // Removed reply_markup: { remove_keyboard: true } to keep the persistent keyboard visible
   });
 
   userStates[userId] = {

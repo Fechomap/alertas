@@ -64,7 +64,7 @@ function setupCommandHandlers(bot) {
       const success = cancelAllAlertsForChat(chatId); // Function from alert.js
       if (success) {
         console.log(`✅ Todas las alertas canceladas en chat ${chatId} por ${userId}`);
-        bot.sendMessage(chatId, '✅ *Todas las alertas activas en este chat han sido canceladas.*', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, '✅ *Alerta DESACTIVADA, ya se esta atendiendo la peticion, de la CONFERENCIA... GRACIAS!!!*', { parse_mode: 'Markdown' });
       } else {
         console.error(`❌ Error al intentar cancelar alertas en chat ${chatId}`);
         bot.sendMessage(chatId, '❌ *Ocurrió un error al intentar cancelar las alertas.*', { parse_mode: 'Markdown' });
