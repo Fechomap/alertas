@@ -1,3 +1,5 @@
+// src/services/maniobra.js
+// Versión modificada para asegurar que siempre se use el nombre real del grupo de Telegram
 const mongoose = require('mongoose');
 const { Maniobra } = require('../models');
 const keyboards = require('../ui/keyboards');
@@ -22,10 +24,10 @@ function startManiobrasFlow(bot, chatId, userId) {
     return false;
   }
 
-  // Don't remove the persistent keyboard when starting the maniobras flow
+  // No eliminar el teclado persistente cuando se inicia el flujo de maniobras
   bot.sendMessage(chatId, '🔢 *¿Cuántas maniobras autorizadas? (1-10)*', {
     parse_mode: 'Markdown'
-    // Removed reply_markup: { remove_keyboard: true } to keep the persistent keyboard visible
+    // Se eliminó reply_markup: { remove_keyboard: true } para mantener el teclado visible
   });
 
   userStates[userId] = {
@@ -66,12 +68,15 @@ async function handleManiobrasState(bot, userId, text, chatId) {
 
       case 'confirming_maniobras':
         if (text === '✅ Confirmar') {
+          // Obtener el nombre REAL del grupo directamente de Telegram
           const groupInfo = await bot.getChat(chatId);
           const groupName = groupInfo.title || `Grupo ${chatId}`;
+          
+          console.log(`📋 Registrando maniobra en grupo: "${groupName}" (ID: ${chatId})`);
 
           const maniobra = new Maniobra({
             chatId: chatId.toString(),
-            groupName,
+            groupName, // Usar siempre el nombre real del grupo de Telegram
             alertManagerId: userId,
             maniobras: state.data.quantity,
             descripcion: `Registro de ${state.data.quantity} maniobras autorizadas`
@@ -108,9 +113,9 @@ async function handleManiobrasState(bot, userId, text, chatId) {
     bot.sendMessage(chatId, '❌ *Ocurrió un error interno al procesar el estado de maniobras. Por favor, intenta nuevamente.*', {
       parse_mode: 'Markdown'
     });
-    // Clear the state on error to prevent getting stuck
+    // Limpiar el estado en caso de error para evitar quedarse atascado
     delete userStates[userId]; 
-    // Return false because the message was NOT successfully handled by the state machine
+    // Devolver false porque el mensaje NO fue procesado correctamente por la máquina de estados
     return false; 
   }
 }
