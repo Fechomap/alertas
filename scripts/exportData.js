@@ -1,5 +1,5 @@
-// exportData.js
-const XLSX = require('xlsx');
+// scripts/exportData.js
+const ExcelJS = require('exceljs');
 const mongoose = require('mongoose');
 const path = require('path');
 const config = require('./config');
@@ -25,36 +25,64 @@ async function exportToExcel() {
     // Obtener grupos únicos de maniobras
     const uniqueGroups = [...new Set(maniobras.map(m => m.chatId))];
     
-    // Crear hoja de grupos
-    const groupsData = uniqueGroups.map(chatId => ({
-      'ID del Grupo': chatId,
-      'Nombre para Mostrar': groupMap[chatId] || ''
-    }));
-
-    // Preparar datos para Excel
-    const maniobraData = maniobras.map(m => ({
-      'ID del Grupo': m.chatId,
-      'Nombre del Grupo': groupMap[m.chatId] || m.groupName,
-      'ID del Alert Manager': m.alertManagerId,
-      'Cantidad de Maniobras': m.maniobras,
-      'Descripción': m.descripcion,
-      'Fecha': m.fecha.toISOString(),
-      'Fecha (formato legible)': m.fecha.toLocaleString()
-    }));
-
-    // Crear libro de Excel
-    const wb = XLSX.utils.book_new();
+    // Crear un nuevo libro de trabajo Excel
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Bot Soporte';
+    workbook.lastModifiedBy = 'Sistema de Exportación';
+    workbook.created = new Date();
+    workbook.modified = new Date();
     
-    // Agregar hojas
-    const wsManiobras = XLSX.utils.json_to_sheet(maniobraData);
-    const wsGroups = XLSX.utils.json_to_sheet(groupsData);
-    XLSX.utils.book_append_sheet(wb, wsManiobras, 'Maniobras');
-    XLSX.utils.book_append_sheet(wb, wsGroups, 'Grupos');
-
+    // Preparar hoja de maniobras
+    const maniobraSheet = workbook.addWorksheet('Maniobras');
+    maniobraSheet.columns = [
+      { header: 'ID del Grupo', key: 'chatId', width: 15 },
+      { header: 'Nombre del Grupo', key: 'groupName', width: 25 },
+      { header: 'ID del Alert Manager', key: 'alertManagerId', width: 20 },
+      { header: 'Cantidad de Maniobras', key: 'maniobras', width: 20 },
+      { header: 'Descripción', key: 'descripcion', width: 30 },
+      { header: 'Fecha', key: 'fecha', width: 20 }
+    ];
+    
+    // Aplicar estilo a la fila de encabezado
+    maniobraSheet.getRow(1).font = { bold: true };
+    
+    // Formatear la columna de fecha
+    maniobraSheet.getColumn('fecha').numFmt = 'dd/mm/yyyy hh:mm:ss';
+    
+    // Agregar los datos de maniobras
+    maniobras.forEach(m => {
+      maniobraSheet.addRow({
+        chatId: m.chatId,
+        groupName: groupMap[m.chatId] || m.groupName,
+        alertManagerId: m.alertManagerId,
+        maniobras: m.maniobras,
+        descripcion: m.descripcion,
+        fecha: m.fecha // ExcelJS maneja bien las fechas de JavaScript
+      });
+    });
+    
+    // Preparar hoja de grupos
+    const groupSheet = workbook.addWorksheet('Grupos');
+    groupSheet.columns = [
+      { header: 'ID del Grupo', key: 'chatId', width: 15 },
+      { header: 'Nombre para Mostrar', key: 'displayName', width: 30 }
+    ];
+    
+    // Aplicar estilo a la fila de encabezado
+    groupSheet.getRow(1).font = { bold: true };
+    
+    // Agregar datos de grupos
+    uniqueGroups.forEach(chatId => {
+      groupSheet.addRow({
+        chatId: chatId,
+        displayName: groupMap[chatId] || ''
+      });
+    });
+    
     // Guardar archivo en la carpeta scripts
     const filename = path.join(__dirname, 'data.xlsx');
-    XLSX.writeFile(wb, filename);
-
+    await workbook.xlsx.writeFile(filename);
+    
     console.log(`Datos exportados exitosamente a ${filename}`);
     await mongoose.disconnect();
   } catch (error) {
