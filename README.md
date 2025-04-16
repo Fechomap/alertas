@@ -4,73 +4,47 @@ Bot de Telegram para gestión de alertas y maniobras en grupos de soporte.
 
 ## Descripción
 
-Este bot permite a operadores enviar alertas a grupos de Telegram y a los gestores de alertas (Alert Managers) cancelar esas alertas y registrar maniobras. El sistema también incluye generación de reportes y gestión de grupos.
+Este bot permite a operadores enviar alertas a grupos de Telegram y a los gestores de alertas (Alert Managers) cancelar esas alertas y registrar maniobras.
 
-## Requisitos
+## Requisitos Mínimos
 
 - Node.js 14.x o superior
 - MongoDB
-- Cuenta de Telegram
 - Token de bot de Telegram (obtenido a través de BotFather)
-- Cuenta en Heroku (para despliegue en producción)
+- Cuenta en Heroku (para despliegue)
+- Heroku CLI instalado
 
-## Variables de Entorno
+## Configuración Rápida
 
-Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
+1. Crea un archivo `.env` en la raíz del proyecto:
 
 ```
 TELEGRAM_BOT_TOKEN=tu_token_de_telegram_aquí
 MONGO_URI=tu_uri_de_mongodb_aquí
 NODE_ENV=development
-HEROKU_APP_URL=https://tu-app-en-heroku.herokuapp.com
 ```
 
-## Instalación
+2. Instala las dependencias:
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/tu-usuario/bot-soporte.git
-cd bot-soporte
-
-# Instalar dependencias
 npm install
 ```
 
-## Estructura del Proyecto
+3. Inicia el bot en modo desarrollo:
 
-```
-/
-├── src/                    # Código fuente principal
-│   ├── index.js            # Punto de entrada
-│   ├── config/             # Configuración 
-│   │   ├── index.js        # Exporta toda la configuración
-│   │   ├── database.js     # Configuración de MongoDB
-│   │   └── constants.js    # Constantes (IDs, tipos de alertas, etc.)
-│   ├── models/             # Modelos de datos
-│   │   ├── index.js        # Exporta todos los modelos
-│   │   ├── maniobra.js     # Modelo de maniobra
-│   │   └── group.js        # Modelo de grupo
-│   ├── services/           # Servicios y lógica de negocio
-│   │   ├── alert.js        # Manejo de alertas
-│   │   └── maniobra.js     # Manejo de maniobras
-│   ├── utils/              # Funciones de utilidad
-│   │   ├── index.js        # Exporta todas las utilidades
-│   │   └── permissions.js  # Verificación de permisos
-│   ├── handlers/           # Manejadores de comandos y mensajes
-│   │   ├── index.js        # Exporta todos los manejadores
-│   │   ├── commands.js     # Manejo de comandos (/start, etc.)
-│   │   └── messages.js     # Manejo de mensajes de texto
-│   └── ui/                 # Interfaz de usuario
-│       └── keyboards.js    # Definición de teclados personalizados
-├── scripts/                # Scripts utilitarios
-│   ├── clearDatabase.js    # Limpiar base de datos
-│   ├── exportData.js       # Exportar datos
-│   └── importData.js       # Importar datos
-├── .env                    # Variables de entorno
-├── package.json            # Dependencias y scripts
+```bash
+npm run dev
 ```
 
-## Comandos
+## Comandos Esenciales
+
+### Comandos del Bot
+
+- `/start` - Inicia el bot y muestra el menú principal
+- `/help` - Muestra instrucciones de ayuda
+- `/stopalert` - (Solo Alert Managers) Cancela todas las alertas activas en el chat
+
+### Comandos de Terminal (Local)
 
 ```bash
 # Desarrollo local (con auto-recarga)
@@ -89,94 +63,77 @@ npm run import
 npm run clear-db
 ```
 
-## Gestión en Heroku
-
-### Configuración de Heroku
-
-Asegúrate de tener instalada la CLI de Heroku y estar autenticado:
+### Comandos Git y Heroku
 
 ```bash
-# Instalar CLI de Heroku (si no la tienes)
-brew install heroku/brew/heroku  # macOS con Homebrew
-# o
-npm install -g heroku            # Con npm
+# Git - Guardar cambios locales
+git add .
+git commit -m "Descripción del cambio"
 
-# Autenticar
-heroku login
-```
+# Git - Empujar a repositorio remoto
+git push origin main
 
-### Comandos de Gestión para la Aplicación
-
-```bash
-# Ver información de la aplicación
-heroku apps:info -a alertas
-
-# Ver logs en tiempo real
-heroku logs --tail -a alertas
-
-# Reiniciar la aplicación
-heroku restart -a alertas
-
-# Escalar dynos (cambiar el número de instancias)
-heroku ps:scale web=1 -a alertas
-
-# Detener la aplicación (escalar a 0)
-heroku ps:scale web=0 -a alertas
-
-# Iniciar la aplicación (escalar a 1 o más)
-heroku ps:scale web=1 -a alertas
-
-# Ver variables de configuración
-heroku config -a alertas
-
-# Establecer una variable de configuración
-heroku config:set NOMBRE_VARIABLE=valor -a alertas
-
-# Eliminar una variable de configuración
-heroku config:unset NOMBRE_VARIABLE -a alertas
-```
-
-### Gestión de Despliegue
-
-```bash
-# Desplegar cambios (después de hacer commit)
+# Heroku - Empujar cambios y desplegar
 git push heroku main
 
-# Ejecutar comando en el servidor
-heroku run npm run comando -a alertas
+# Heroku - Ver logs en vivo
+heroku logs --tail -a alertas
 
-# Abrir la aplicación en el navegador
-heroku open -a alertas
+# Heroku - Gestión de dynos
+heroku ps:scale web=1 -a alertas  # Escalar a 1 dyno
+heroku ps:scale web=0 -a alertas  # Detener la aplicación
+heroku ps:restart -a alertas      # Reiniciar dynos
+
+# Heroku - Comprobar estado
+heroku ps -a alertas
 ```
 
-## Variables de Configuración Actuales
+## Funcionalidades Principales
 
-- **APP_URL**: https://alertas-5f770ceb3390.herokuapp.com
-- **HEROKU_APP_URL**: https://alertas-5f770ceb3390.herokuapp.com
-- **WEBHOOK_URL**: https://alertas-5f770ceb3390.herokuapp.com
+1. **Alertas de Conferencia** - Operadores pueden solicitar apoyo mediante alertas
+2. **Registro de Maniobras** - Alert Managers pueden registrar maniobras (1-10)
+3. **Generación de Reportes** - Ver informes de maniobras registradas
 
-## Seguridad
+## Tipos de Usuarios
 
-- Los IDs de usuarios con permisos especiales están definidos en `src/config/constants.js`
-- Las credenciales de MongoDB y el token del bot deben mantenerse seguros
-- Nunca compartas tus tokens o credenciales en repositorios públicos
+- **Operadores**: Pueden iniciar alertas
+- **Alert Managers**: Pueden cancelar alertas y registrar maniobras
+- **Super Admin**: Privilegios especiales de administración
 
-## Mantenimiento
+## Flujo de Uso Básico
 
-Para mantener el servicio funcionando correctamente:
+1. Operador solicita apoyo usando el botón de Conferencia
+2. El bot envía alertas periódicas al grupo
+3. Alert Manager cancela la alerta cuando se atiende
+4. Alert Manager registra maniobras realizadas
 
-1. Monitorea regularmente los logs con `heroku logs --tail -a alertas`
-2. Realiza backups periódicos usando `npm run export`
-3. Revisa que la aplicación esté activa con `heroku ps -a alertas`
+## Solución de Problemas Comunes
 
-## Problemas Comunes
+- **Bot no responde**: Verifica las credenciales en `.env`
+- **Errores de MongoDB**: Asegúrate que MongoDB esté ejecutándose
+- **Comandos no funcionan**: Verifica que el usuario tiene los permisos necesarios
 
-Si el bot deja de responder:
+## Problemas Comunes con Heroku
+
+Si el bot deja de responder en Heroku:
+
 1. Verifica los logs: `heroku logs --tail -a alertas`
 2. Reinicia la aplicación: `heroku restart -a alertas`
-3. Asegúrate de que los dynos estén activos: `heroku ps -a alertas`
-4. Comprueba la conectividad con MongoDB y Telegram
+3. Asegúrate que los dynos estén activos: `heroku ps -a alertas`
+4. Verifica las variables de entorno: `heroku config -a alertas`
+5. Comprueba que el webhook está configurado: `heroku config:get WEBHOOK_URL -a alertas`
 
-## Licencia
+## Variables de Configuración en Heroku
 
-ISC
+```bash
+# Ver todas las variables
+heroku config -a alertas
+
+# Configurar variables
+heroku config:set TELEGRAM_BOT_TOKEN=nuevo_token -a alertas
+heroku config:set MONGO_URI=nueva_uri -a alertas
+heroku config:set NODE_ENV=production -a alertas
+
+# Eliminar una variable
+heroku config:unset NOMBRE_VARIABLE -a alertas
+```
