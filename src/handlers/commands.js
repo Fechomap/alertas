@@ -7,6 +7,7 @@ const { clearUserStates } = require('../services/maniobra');
 function setupCommandHandlers(bot) {
   // Comando /start
   bot.onText(/\/start/, (msg) => {
+    console.log('🚀 Comando /start recibido');
     const chatId = msg.chat.id;
     sendMainMenu(bot, chatId);
   });

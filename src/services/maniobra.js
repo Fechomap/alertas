@@ -7,6 +7,7 @@ const { isAlertManager } = require('../utils/permissions');
 const userStates = {};
 
 function startManiobrasFlow(bot, chatId, userId) {
+  console.log('🔄 Iniciando flujo de maniobras para usuario:', userId);
   if (!isAlertManager(userId)) {
     bot.sendMessage(chatId, '⛔ *Solo los Alert Manager pueden registrar maniobras.*', {
       parse_mode: 'Markdown'
@@ -40,6 +41,7 @@ async function handleManiobrasState(bot, userId, text, chatId) {
   if (!state || state.chatId !== chatId) return false;
 
   try {
+    console.log(`🔄 Procesando estado de maniobra: ${state.step} para usuario: ${userId}, texto: "${text}"`);
     switch (state.step) {
       case 'awaiting_maniobras_quantity':
         const quantity = parseInt(text);

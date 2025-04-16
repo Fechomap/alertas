@@ -6,13 +6,16 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const TelegramBot = require('node-telegram-bot-api');
 
-const { database } = require('./config/database');
+// Importaciones correctas
+const database = require('./config/database');
 const { setupHandlers } = require('./handlers');
 
 // Variables de entorno
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const url = process.env.HEROKU_APP_URL || 'https://tu-app-en-heroku.herokuapp.com';
 const environment = process.env.NODE_ENV || 'development';
+
+console.log('🔄 Iniciando bot en modo:', environment);
 
 // Inicialización del bot
 let bot;
@@ -26,11 +29,15 @@ if (environment === 'development') {
   console.log('⚙️ Bot iniciado en modo WEBHOOK (producción)');
 }
 
-// Conectar a la base de datos
-database.connect();
-
-// Configurar manejadores
-setupHandlers(bot);
+// Conectar a la base de datos - CORREGIDO
+database.connect().then(() => {
+  console.log('🔄 Base de datos conectada, configurando handlers...');
+  // Configurar manejadores - AQUÍ ESTABA EL PROBLEMA PRINCIPAL
+  setupHandlers(bot);
+  console.log('✅ Bot completamente configurado y listo para recibir comandos');
+}).catch(err => {
+  console.error('❌ Error conectando a la base de datos:', err);
+});
 
 // Manejo de errores
 bot.on('polling_error', (error) => {

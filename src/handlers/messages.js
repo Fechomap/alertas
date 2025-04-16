@@ -19,7 +19,9 @@ function sendApoyoMenu(bot, chatId) {
 }
 
 function setupMessageHandlers(bot) {
+  console.log('🔄 Configurando handler de mensajes...');
   bot.on('message', (msg) => {
+    console.log('📨 Mensaje recibido:', msg.text || 'sin texto');
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text ? msg.text.trim() : '';
@@ -64,6 +66,7 @@ function setupMessageHandlers(bot) {
       }
     }
   });
+  console.log('✅ Handler de mensajes registrado correctamente');
 }
 
 module.exports = {
