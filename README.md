@@ -11,8 +11,8 @@ Este bot permite a operadores enviar alertas a grupos de Telegram y a los gestor
 - Node.js 14.x o superior
 - MongoDB
 - Token de bot de Telegram (obtenido a través de BotFather)
-- Cuenta en Heroku (para despliegue)
-- Heroku CLI instalado
+- Cuenta en Railway para despliegue
+- Git instalado
 
 ## Configuración Rápida
 
@@ -43,6 +43,7 @@ npm run dev
 - `/start` - Inicia el bot y muestra el menú principal
 - `/help` - Muestra instrucciones de ayuda
 - `/stopalert` - (Solo Alert Managers) Cancela todas las alertas activas en el chat
+- `/report` - (Solo Alert Managers) Genera y envía el reporte semanal en Excel
 
 ### Comandos de Terminal (Local)
 
@@ -63,7 +64,7 @@ npm run import
 npm run clear-db
 ```
 
-### Comandos Git y Heroku
+### Comandos Git y Railway
 
 ```bash
 # Git - Guardar cambios locales
@@ -73,26 +74,64 @@ git commit -m "Descripción del cambio"
 # Git - Empujar a repositorio remoto
 git push origin main
 
-# Heroku - Empujar cambios y desplegar
-git push heroku main
+# Railway - Desplegar aplicación
+railway up
 
-# Heroku - Ver logs en vivo
-heroku logs --tail -a alertas
+# Railway - Ver logs en vivo
+railway logs
 
-# Heroku - Gestión de dynos
-heroku ps:scale web=1 -a alertas  # Escalar a 1 dyno
-heroku ps:scale web=0 -a alertas  # Detener la aplicación
-heroku ps:restart -a alertas      # Reiniciar dynos
+# Railway - Gestión de variables de entorno
+railway variables set VARIABLE=valor
 
-# Heroku - Comprobar estado
-heroku ps -a alertas
+# Railway - Reiniciar servicio
+railway restart
+
+# Railway - Obtener URL de producción
+railway status
+```
+
+## Despliegue en Railway
+
+### 1. Configuración inicial
+
+```bash
+# Instalar Railway CLI
+npm i -g @railway/cli
+
+# Autenticarte en Railway
+railway login
+
+# Conectar proyecto con Railway
+railway init
+```
+
+### 2. Variables de entorno necesarias
+
+```env
+TELEGRAM_BOT_TOKEN=tu_token
+MONGO_URI=mongodb+srv://...
+NODE_ENV=production
+PORT=3000
+```
+
+### 3. Despliegue
+
+```bash
+# Desplegar aplicación
+railway up
+
+# Ver el estado
+railway status
+
+# Ver logs
+railway logs --tail
 ```
 
 ## Funcionalidades Principales
 
 1. **Alertas de Conferencia** - Operadores pueden solicitar apoyo mediante alertas
 2. **Registro de Maniobras** - Alert Managers pueden registrar maniobras (1-10)
-3. **Generación de Reportes** - Ver informes de maniobras registradas
+3. **Generación de Reportes** - Ver informes de maniobras registradas en formato Excel
 
 ## Tipos de Usuarios
 
@@ -113,27 +152,38 @@ heroku ps -a alertas
 - **Errores de MongoDB**: Asegúrate que MongoDB esté ejecutándose
 - **Comandos no funcionan**: Verifica que el usuario tiene los permisos necesarios
 
-## Problemas Comunes con Heroku
+## Problemas Comunes con Railway
 
-Si el bot deja de responder en Heroku:
+Si el bot deja de responder en Railway:
 
-1. Verifica los logs: `heroku logs --tail -a alertas`
-2. Reinicia la aplicación: `heroku restart -a alertas`
-3. Asegúrate que los dynos estén activos: `heroku ps -a alertas`
-4. Verifica las variables de entorno: `heroku config -a alertas`
-5. Comprueba que el webhook está configurado: `heroku config:get WEBHOOK_URL -a alertas`
+1. Verifica los logs: `railway logs`
+2. Reinicia la aplicación: `railway restart`
+3. Verifica las variables de entorno: `railway variables`
+4. Comprueba el estado del servicio: `railway status`
+5. Asegúrate que el webhook está configurado: logs deben mostrar "⚙️ Bot iniciado en modo WEBHOOK (producción)"
 
-## Variables de Configuración en Heroku
+## Variables de Configuración en Railway
 
 ```bash
 # Ver todas las variables
-heroku config -a alertas
+railway variables
 
 # Configurar variables
-heroku config:set TELEGRAM_BOT_TOKEN=nuevo_token -a alertas
-heroku config:set MONGO_URI=nueva_uri -a alertas
-heroku config:set NODE_ENV=production -a alertas
+railway variables set VARIABLE=valor
 
 # Eliminar una variable
-heroku config:unset NOMBRE_VARIABLE -a alertas
+railway variables delete VARIABLE
+```
+
+## Monitoreo
+
+```bash
+# Ver recursos utilizados
+railway metrics
+
+# Ver estado detallado
+railway status -d
+
+# Ver logs históricos
+railway logs --limit 500
 ```
