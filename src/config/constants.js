@@ -14,10 +14,8 @@ const alertTypes = {
 
 // Remove unused button actions
 const buttonActions = {
-  '🤝 APOYO': 'APOYO',
-  '🚗 MANIOBRAS': 'Maniobras',
-  '📞 CONFERENCIA': 'Conferencia'
-  // Removed '🚫 NA NO ESTA EN VH' and '🔍 VALIDAR ORIGEN'
+  '🤝 APOYO': 'Conferencia',    // Ahora APOYO mapea directamente a Conferencia
+  '🚗 MANIOBRAS': 'Maniobras'
 };
 
 // Remove unused cancellation messages

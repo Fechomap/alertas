@@ -11,21 +11,12 @@ function setupCommandHandlers(bot) {
   bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     console.log('🚀 Comando /start recibido');
-    clearUserStates(chatId); // Clear any pending states
-    
-    // First, send the main menu with inline keyboard
-    sendMainMenu(bot, chatId);
-    
-    // Then, set up the persistent keyboard
+    clearUserStates(chatId);
+
+    // Mostrar menú principal con teclado persistente
     const keyboards = require('../ui/keyboards');
-    bot.sendMessage(chatId, 'Puedes usar el botón de abajo para volver al menú principal en cualquier momento.', {
+    bot.sendMessage(chatId, '🟢 Bot activado. Usa los botones de abajo para comenzar.', {
       reply_markup: keyboards.getPersistentKeyboard()
-    }).then(sentMsg => {
-      // Delete this message after a short delay to avoid cluttering the chat
-      setTimeout(() => {
-        bot.deleteMessage(chatId, sentMsg.message_id).catch(err => 
-          console.error("Error eliminando mensaje informativo:", err));
-      }, 5000);
     });
   });
 

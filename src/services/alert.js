@@ -1,75 +1,51 @@
 const { alertTypes, cancelationMessages } = require('../config/constants');
 const { getUserName } = require('../utils/permissions');
+const { sendWithPersistentKeyboard } = require('../utils/keyboard-helper');
 
 // Almacena alertas activas
 const activeAlerts = {};
 
 function startAlert(bot, userId, alertType, chatId, userName) {
   try {
-    console.log(`🔔 Iniciando alerta: Tipo=${alertType}, Usuario=${userId}, Chat=${chatId}`);
     const alertInfo = alertTypes[alertType];
-    if (!alertInfo) {
-      console.error(`❌ Tipo de alerta desconocido: ${alertType}`);
-      return;
-    }
+    if (!alertInfo) return;
 
-    // --- Robustness Checks ---
-    // Ensure chatId level exists
-    if (!activeAlerts[chatId]) {
-      console.log(`🔧 Inicializando activeAlerts para chatId: ${chatId}`);
-      activeAlerts[chatId] = {};
-    }
-    // Ensure userId level exists within chatId
-    if (!activeAlerts[chatId][userId]) {
-      console.log(`🔧 Inicializando activeAlerts[${chatId}] para userId: ${userId}`);
-      activeAlerts[chatId][userId] = {};
-    }
-    // --- End Robustness Checks ---
+    if (!activeAlerts[chatId]) activeAlerts[chatId] = {};
+    if (!activeAlerts[chatId][userId]) activeAlerts[chatId][userId] = {};
 
-    // Check if this specific alert type is already active for the user
     if (activeAlerts[chatId]?.[userId]?.[alertType]?.interval) {
-      console.log(`🔄 Reiniciando alerta existente: Tipo=${alertType}, Usuario=${userId}`);
       clearInterval(activeAlerts[chatId][userId][alertType].interval);
-      // No need to delete here, it will be overwritten below
     }
 
-    // Check maximum active alerts *after* potentially clearing an existing one
     const userAlerts = activeAlerts[chatId][userId];
-    // Count only alerts that still have an interval (might be redundant now, but safe)
-    const activeCount = Object.values(userAlerts).filter(alert => alert?.interval).length; 
-    
-    // Allow replacing an existing alert even if at max capacity
-    if (activeCount >= 2 && !activeAlerts[chatId]?.[userId]?.[alertType]) { 
-      console.log(`🚫 Usuario ${userId} ya tiene ${activeCount} alertas activas.`);
-      bot.sendMessage(chatId, '🚫 *Ya tienes el máximo de dos alertas activas.*', { parse_mode: 'Markdown' });
-      return; // Stop if max reached and not replacing existing
-    }
+    const activeCount = Object.values(userAlerts).filter(alert => alert?.interval).length;
+
+    if (activeCount >= 2 && !activeAlerts[chatId]?.[userId]?.[alertType]) return;
 
     const message = alertInfo.message;
     let intervalId;
-    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+
+    sendWithPersistentKeyboard(bot, chatId, message)
       .then(() => {
         intervalId = setInterval(() => {
-          bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+          sendWithPersistentKeyboard(bot, chatId, message)
             .catch(error => {
-              console.error(`Error en intervalo: ${error}`);
               clearInterval(intervalId);
               delete activeAlerts[chatId][userId][alertType];
             });
         }, 20000);
+
         activeAlerts[chatId][userId][alertType] = {
           interval: intervalId,
           message: message,
           userName: userName
         };
       })
-      .catch(error => {
-        console.error(`Error iniciando alerta: ${error}`);
+      .catch(() => {
         if (intervalId) clearInterval(intervalId);
       });
-  } catch (error) {
-    console.error(`Error en startAlert para ${chatId}/${userId}/${alertType}:`, error);
-    bot.sendMessage(chatId, '❌ *Error al iniciar alerta. Por favor, intenta nuevamente.*', { parse_mode: 'Markdown' });
+  } catch {
+    sendWithPersistentKeyboard(bot, chatId, '❌ *Error al iniciar alerta. Por favor, intenta nuevamente.*');
   }
 }
 
