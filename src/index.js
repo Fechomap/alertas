@@ -12,7 +12,7 @@ const { setupHandlers } = require('./handlers');
 
 // Variables de entorno
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const url = process.env.HEROKU_APP_URL || 'https://tu-app-en-heroku.herokuapp.com';
+const url = process.env.PUBLIC_DOMAIN || `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
 const environment = process.env.NODE_ENV || 'development';
 
 console.log('🔄 Iniciando bot en modo:', environment);
