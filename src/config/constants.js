@@ -14,7 +14,7 @@ const alertTypes = {
 
 // Remove unused button actions
 const buttonActions = {
-  '🤝 APOYO': 'Conferencia',    // Ahora APOYO mapea directamente a Conferencia
+  '📞 CONFERENCIA': 'Conferencia',
   '🚗 MANIOBRAS': 'Maniobras'
 };
 

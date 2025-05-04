@@ -65,15 +65,27 @@ function setupCallbackQueryHandlers(bot) {
 
     // --- Main Actions ---
     switch (action) {
-      case 'APOYO':
-        console.log('🖱️ Acción APOYO detectada (callback)');
-        // Edit the current message to show the Apoyo menu
-         bot.editMessageText('Menú de APOYO. Selecciona una opción:', {
+      case 'Conferencia':
+        console.log('🖱️ Acción CONFERENCIA detectada (callback)');
+        // Edit the current message to show conferencia action
+         bot.editMessageText('Activando alerta: CONFERENCIA...', {
            chat_id: chatId,
            message_id: message.message_id,
-           reply_markup: keyboards.getApoyoMenuKeyboard(),
+           reply_markup: null, // Remove buttons
            parse_mode: 'Markdown'
-         }).catch(err => console.error("Error editando mensaje a Apoyo Menu:", err));
+         }).catch(err => console.error("Error editando mensaje de conferencia:", err));
+         
+        // Ejecutar la acción directamente como el botón original
+        if (isOperator(userId)) {
+          handleOperatorAction(bot, action, chatId, userId, from);
+        } else if (isAlertManager(userId)) {
+          // Alert Managers probablemente no inicien alertas de esta forma
+          console.log(`⚠️ Usuario ${userId} es ALERT MANAGER, no puede iniciar alerta directamente.`);
+          bot.sendMessage(chatId, `⛔ *Los Alert Managers no inician alertas directamente.*`, { parse_mode: 'Markdown' });
+        } else {
+          console.log(`⚠️ Usuario ${userId} sin permisos para acción ${action}`);
+          bot.sendMessage(chatId, '⛔ *No tienes permisos para ejecutar esta acción.*', { parse_mode: 'Markdown' });
+        }
         break;
 
       case 'Maniobras':

@@ -2,13 +2,13 @@
 
 // Teclado persistente principal
 function getPersistentKeyboard() {
-  const apoyoText = '🤝 APOYO';
+  const conferenciaText = '📞 CONFERENCIA';
   const maniobrasText = '🚗 MANIOBRAS';
   
   return {
     keyboard: [
       [
-        { text: apoyoText },
+        { text: conferenciaText },
         { text: maniobrasText }
       ]
     ],
