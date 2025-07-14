@@ -9,6 +9,7 @@ const TelegramBot = require('node-telegram-bot-api');
 // Importaciones correctas
 const database = require('./config/database');
 const { setupHandlers } = require('./handlers');
+const { initializeScheduler } = require('./services/scheduler');
 
 // Variables de entorno
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -34,6 +35,10 @@ database.connect().then(() => {
   console.log('🔄 Base de datos conectada, configurando handlers...');
   // Configurar manejadores - AQUÍ ESTABA EL PROBLEMA PRINCIPAL
   setupHandlers(bot);
+  
+  // Inicializar sistema de jobs automáticos
+  initializeScheduler(bot);
+  
   console.log('✅ Bot completamente configurado y listo para recibir comandos');
 }).catch(err => {
   console.error('❌ Error conectando a la base de datos:', err);
