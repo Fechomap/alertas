@@ -8,7 +8,12 @@
     "export": "node scripts/exportData.js",
     "import": "node scripts/importData.js",
     "clear-db": "node scripts/clearDatabase.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix",
+    "format": "prettier --write src/**/*.js"
   },
   "author": "",
   "license": "ISC",
@@ -24,6 +29,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "@eslint/js": "^9.31.0",
+    "@types/jest": "^30.0.0",
+    "eslint": "^9.31.0",
+    "jest": "^30.0.4",
+    "nodemon": "^3.1.0",
+    "prettier": "^3.6.2"
   }
 }

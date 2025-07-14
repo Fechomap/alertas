@@ -8,10 +8,10 @@ const activeAlerts = {};
 function startAlert(bot, userId, alertType, chatId, userName) {
   try {
     const alertInfo = alertTypes[alertType];
-    if (!alertInfo) return;
+    if (!alertInfo) {return;}
 
-    if (!activeAlerts[chatId]) activeAlerts[chatId] = {};
-    if (!activeAlerts[chatId][userId]) activeAlerts[chatId][userId] = {};
+    if (!activeAlerts[chatId]) {activeAlerts[chatId] = {};}
+    if (!activeAlerts[chatId][userId]) {activeAlerts[chatId][userId] = {};}
 
     if (activeAlerts[chatId]?.[userId]?.[alertType]?.interval) {
       clearInterval(activeAlerts[chatId][userId][alertType].interval);
@@ -20,7 +20,7 @@ function startAlert(bot, userId, alertType, chatId, userName) {
     const userAlerts = activeAlerts[chatId][userId];
     const activeCount = Object.values(userAlerts).filter(alert => alert?.interval).length;
 
-    if (activeCount >= 2 && !activeAlerts[chatId]?.[userId]?.[alertType]) return;
+    if (activeCount >= 2 && !activeAlerts[chatId]?.[userId]?.[alertType]) {return;}
 
     const message = alertInfo.message;
     let intervalId;
@@ -29,7 +29,7 @@ function startAlert(bot, userId, alertType, chatId, userName) {
       .then(() => {
         intervalId = setInterval(() => {
           sendWithPersistentKeyboard(bot, chatId, message)
-            .catch(error => {
+            .catch(_error => {
               clearInterval(intervalId);
               delete activeAlerts[chatId][userId][alertType];
             });
@@ -42,7 +42,7 @@ function startAlert(bot, userId, alertType, chatId, userName) {
         };
       })
       .catch(() => {
-        if (intervalId) clearInterval(intervalId);
+        if (intervalId) {clearInterval(intervalId);}
       });
   } catch {
     sendWithPersistentKeyboard(bot, chatId, '❌ *Error al iniciar alerta. Por favor, intenta nuevamente.*');
@@ -84,13 +84,13 @@ function cancelAllAlertsForChat(chatId) {
 
 function handleOperatorAction(bot, alertType, chatId, userId, from) {
   switch (alertType) {
-    case 'Conferencia':
-    case 'USUARIO_NO_ESTA_EN_VH':
-    case 'VALIDACION_DE_ORIGEN':
-      startAlert(bot, userId, alertType, chatId, getUserName(from));
-      break;
-    default:
-      break;
+  case 'Conferencia':
+  case 'USUARIO_NO_ESTA_EN_VH':
+  case 'VALIDACION_DE_ORIGEN':
+    startAlert(bot, userId, alertType, chatId, getUserName(from));
+    break;
+  default:
+    break;
   }
 }
 
@@ -98,23 +98,23 @@ function handleAlertManagerDeactivation(bot, alertType, chatId) {
   try {
     let alertFound = false;
     const chatOperatorsAlerts = activeAlerts[chatId] || {};
-    
+
     for (const operatorId in chatOperatorsAlerts) {
       if (chatOperatorsAlerts[operatorId]?.[alertType]) {
         stopAlertForUser(chatId, operatorId, alertType);
-        
+
         const message = cancelationMessages[alertType] || '🚫 *No se encontró mensaje de cancelación.*';
         bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-        
+
         alertFound = true;
         break;
       }
     }
-    
+
     if (!alertFound) {
       bot.sendMessage(chatId, '🚫 *No se encontró una alerta activa para cancelar.*', { parse_mode: 'Markdown' });
     }
-    
+
     return alertFound;
   } catch (error) {
     console.error(`Error en handleAlertManagerDeactivation para ${chatId}/${alertType}:`, error);

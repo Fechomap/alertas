@@ -4,7 +4,7 @@
 function getPersistentKeyboard() {
   const conferenciaText = '📞 CONFERENCIA';
   const maniobrasText = '🚗 MANIOBRAS';
-  
+
   return {
     keyboard: [
       [
@@ -12,11 +12,11 @@ function getPersistentKeyboard() {
         { text: maniobrasText }
       ]
     ],
-    resize_keyboard: true,    
-    persistent: true,         
-    one_time_keyboard: false, 
-    is_persistent: true,      
-    selective: false          
+    resize_keyboard: true,
+    persistent: true,
+    one_time_keyboard: false,
+    is_persistent: true,
+    selective: false
   };
 }
 

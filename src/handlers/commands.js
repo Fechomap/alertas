@@ -1,9 +1,9 @@
 // src/handlers/commands.js
-const { sendMainMenu } = require('./messages');
+// const { sendMainMenu } = require('./messages'); // No usado actualmente
 const { isAlertManager } = require('../utils/permissions');
 const { cancelAllAlertsForChat, activeAlerts } = require('../services/alert');
 const { clearUserStates } = require('../services/maniobra');
-const { sendWeeklyExcelReport } = require('../services/report'); // Importar función de reporte
+const { generateWeeklyExcel } = require('../services/report'); // Importar función de reporte
 
 function setupCommandHandlers(bot) {
   console.log('🔄 Configurando handlers de comandos...');
@@ -50,8 +50,8 @@ function setupCommandHandlers(bot) {
     try {
       // Check if there are any alerts in this chat first
       if (!activeAlerts[chatId] || Object.keys(activeAlerts[chatId]).length === 0) {
-         bot.sendMessage(chatId, 'ℹ️ No hay alertas activas en este chat para cancelar.', { parse_mode: 'Markdown' });
-         return;
+        bot.sendMessage(chatId, 'ℹ️ No hay alertas activas en este chat para cancelar.', { parse_mode: 'Markdown' });
+        return;
       }
 
       const success = cancelAllAlertsForChat(chatId); // Function from alert.js
@@ -72,30 +72,29 @@ function setupCommandHandlers(bot) {
   bot.onText(/\/report/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    
+
     if (!isAlertManager(userId)) {
       return bot.sendMessage(chatId, '⛔ Solo los Alert Manager pueden ver el reporte.', { parse_mode: 'Markdown' });
     }
-    
+
     try {
-      const { generateExcel } = require('../services/report');
-      
-      // Generar Excel
-      const excelBuffer = await generateExcel();
-      
+      // Generar Excel semanal
+      const excelBuffer = await generateWeeklyExcel();
+
       // Crear un objeto File-like para el buffer
       const fileOptions = {
         filename: 'data.xlsx',
         contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       };
-      
+
       // Enviar el archivo Excel
       await bot.sendDocument(chatId, excelBuffer, {
-        caption: '📊 *Reporte de Maniobras*',
-        filename: 'data.xlsx',
-        parse_mode: 'Markdown'
-      }, fileOptions);
-      
+        caption: '📊 *Reporte Semanal de Maniobras*\n📅 _Lunes a Domingo (semana actual)_',
+        filename: `reporte_semanal_${new Date().toISOString().split('T')[0]}.xlsx`,
+        parse_mode: 'Markdown',
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
       console.log(`✅ Reporte Excel enviado exitosamente a ${userId} en chat ${chatId}`);
     } catch (error) {
       console.error('Error en /report:', error);

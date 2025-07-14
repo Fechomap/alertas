@@ -35,70 +35,72 @@ function startManiobrasFlow(bot, chatId, userId) {
     step: 'awaiting_maniobras_quantity',
     data: {}
   };
-  
+
   return true;
 }
 
 async function handleManiobrasState(bot, userId, text, chatId) {
   const state = userStates[userId];
-  if (!state || state.chatId !== chatId) return false;
+  if (!state || state.chatId !== chatId) {return false;}
 
   try {
     console.log(`🔄 Procesando estado de maniobra: ${state.step} para usuario: ${userId}, texto: "${text}"`);
     switch (state.step) {
-      case 'awaiting_maniobras_quantity':
-        const quantity = parseInt(text);
-        if (isNaN(quantity) || quantity < 1 || quantity > 10) {
-          sendWithPersistentKeyboard(bot, chatId, '❌ *Por favor, ingresa un número válido entre 1 y 10.*');
-          return true;
-        }
-
-        state.data.quantity = quantity;
-        state.step = 'confirming_maniobras';
-
-        // Enviar confirmación con botones especiales (NO persistente)
-        const confirmMessage = `*¿Confirmas el registro de ${quantity} maniobras?*`;
-
-        await sendWithPersistentKeyboard(bot, chatId, confirmMessage, {
-          forceReplyMarkup: keyboards.getConfirmationKeyboard()
-        });
+    case 'awaiting_maniobras_quantity': {
+      const quantity = parseInt(text);
+      if (isNaN(quantity) || quantity < 1 || quantity > 10) {
+        sendWithPersistentKeyboard(bot, chatId, '❌ *Por favor, ingresa un número válido entre 1 y 10.*');
         return true;
+      }
 
-      case 'confirming_maniobras':
-        if (text === '✅ Confirmar') {
-          const groupInfo = await bot.getChat(chatId);
-          const groupName = groupInfo.title || `Grupo ${chatId}`;
-          
-          const maniobra = new Maniobra({
-            chatId: chatId.toString(),
-            groupName,
-            alertManagerId: userId,
-            maniobras: state.data.quantity,
-            descripcion: `Registro de ${state.data.quantity} maniobras autorizadas`
-          });
+      state.data.quantity = quantity;
+      state.step = 'confirming_maniobras';
 
-          await maniobra.save();
+      // Enviar confirmación con botones especiales (NO persistente)
+      const confirmMessage = `*¿Confirmas el registro de ${quantity} maniobras?*`;
 
-          const confirmMessage = `✅ *Maniobras registradas exitosamente*\n\n` +
+      await sendWithPersistentKeyboard(bot, chatId, confirmMessage, {
+        forceReplyMarkup: keyboards.getConfirmationKeyboard()
+      });
+      return true;
+    }
+
+    case 'confirming_maniobras': {
+      if (text === '✅ Confirmar') {
+        const groupInfo = await bot.getChat(chatId);
+        const groupName = groupInfo.title || `Grupo ${chatId}`;
+
+        const maniobra = new Maniobra({
+          chatId: chatId.toString(),
+          groupName,
+          alertManagerId: userId,
+          maniobras: state.data.quantity,
+          descripcion: `Registro de ${state.data.quantity} maniobras autorizadas`
+        });
+
+        await maniobra.save();
+
+        const confirmMessage = '✅ *Maniobras registradas exitosamente*\n\n' +
                              `🏢 *Grupo:* ${groupName}\n` +
                              `🔢 *Cantidad:* ${state.data.quantity}\n` +
                              `📅 *Fecha:* ${new Date().toLocaleDateString('es-MX')}`;
 
-          // Volver al teclado persistente
-          sendWithPersistentKeyboard(bot, chatId, confirmMessage);
-          delete userStates[userId];
-          return true;
-          
-        } else if (text === '❌ Cancelar') {
-          // Volver al teclado persistente
-          sendWithPersistentKeyboard(bot, chatId, '❌ *Registro de maniobras cancelado.*');
-          delete userStates[userId];
-          return true;
-        }
-        return false;
-        
-      default:
-        return false;
+        // Volver al teclado persistente
+        sendWithPersistentKeyboard(bot, chatId, confirmMessage);
+        delete userStates[userId];
+        return true;
+
+      } else if (text === '❌ Cancelar') {
+        // Volver al teclado persistente
+        sendWithPersistentKeyboard(bot, chatId, '❌ *Registro de maniobras cancelado.*');
+        delete userStates[userId];
+        return true;
+      }
+      return false;
+    }
+
+    default:
+      return false;
     }
   } catch (error) {
     console.error('❌ Error en handleManiobrasState:', error);

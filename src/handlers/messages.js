@@ -12,7 +12,7 @@ function sendMainMenu(bot, chatId) {
 
 function setupMessageHandlers(bot) {
   console.log('🔄 Configurando handler de mensajes...');
-  
+
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -22,7 +22,7 @@ function setupMessageHandlers(bot) {
     // Manejar estados de maniobras
     try {
       const handledByManiobras = await handleManiobrasState(bot, userId, text, chatId);
-      if (handledByManiobras) return;
+      if (handledByManiobras) {return;}
     } catch (error) {
       console.error('❌ Error en handleManiobrasState:', error);
     }
@@ -49,7 +49,7 @@ function setupMessageHandlers(bot) {
     // No hacer nada si el mensaje no coincide con acciones conocidas
     return;
   });
-  
+
   console.log('✅ Handler de mensajes registrado correctamente');
 }
 

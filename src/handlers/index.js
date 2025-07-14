@@ -4,10 +4,10 @@ const { setupCallbackQueryHandlers } = require('./callback_query'); // Import th
 
 function setupHandlers(bot) {
   console.log('🔄 Iniciando configuración de handlers...');
-  
+
   setupCommandHandlers(bot);
   console.log('✅ Handlers de comandos configurados');
-  
+
   setupMessageHandlers(bot); // Still needed for non-button messages and maniobras input
   console.log('✅ Handlers de mensajes configurados');
 

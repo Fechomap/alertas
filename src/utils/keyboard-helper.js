@@ -4,7 +4,7 @@ const keyboards = require('../ui/keyboards');
 function sendWithPersistentKeyboard(bot, chatId, text, options = {}) {
   if (options.forceReplyMarkup) {
     const { forceReplyMarkup, ...restOptions } = options;
-    return bot.sendMessage(chatId, text, { 
+    return bot.sendMessage(chatId, text, {
       ...restOptions,
       parse_mode: 'Markdown',
       reply_markup: forceReplyMarkup,
@@ -12,7 +12,7 @@ function sendWithPersistentKeyboard(bot, chatId, text, options = {}) {
       reply_to_message_id: undefined
     });
   }
-  
+
   const defaultOptions = {
     parse_mode: 'Markdown',
     reply_markup: keyboards.getPersistentKeyboard(),
@@ -20,14 +20,14 @@ function sendWithPersistentKeyboard(bot, chatId, text, options = {}) {
     reply_to_message_id: undefined,
     allow_sending_without_reply: true
   };
-  
+
   const finalOptions = {
     ...defaultOptions,
     ...options,
     reply_markup: keyboards.getPersistentKeyboard(),
     reply_to_message_id: undefined
   };
-  
+
   return bot.sendMessage(chatId, text, finalOptions);
 }
 
