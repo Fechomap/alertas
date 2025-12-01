@@ -1,7 +1,14 @@
 import mongoose from 'mongoose';
 import { PrismaClient } from '@prisma/client';
 
-const MONGO_URI = 'mongodb+srv://ferchomap:XbL4aTOIgU8KiQyS@maniobras.4n5xq.mongodb.net/?retryWrites=true&w=majority&appName=maniobras';
+// IMPORTANTE: Configura esta variable de entorno antes de ejecutar
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  console.error('ERROR: Debes configurar la variable de entorno MONGO_URI');
+  console.error('Ejemplo: MONGO_URI="mongodb+srv://user:pass@host" node scripts/migrate-mongo-to-postgres.mjs');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 

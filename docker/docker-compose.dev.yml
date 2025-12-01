@@ -1,25 +1,34 @@
 version: '3.8'
 
 services:
-  app:
+  bot:
     build:
       context: ..
       dockerfile: docker/Dockerfile.dev
-    volumes:
-      - ..:/app
-      - /app/node_modules
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
+      - PORT=3000
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/alertas_bot
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ALERT_MANAGER_IDS=${ALERT_MANAGER_IDS:-}
+      - OPERATOR_IDS=${OPERATOR_IDS:-}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-}
+      - LOG_LEVEL=debug
+    volumes:
+      - ../src:/app/src
+      - ../prisma:/app/prisma
+      - /app/node_modules
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - alertas-dev
 
   db:
     image: postgres:16-alpine
@@ -36,6 +45,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - alertas-dev
 
   redis:
     image: redis:7-alpine
@@ -49,7 +60,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - alertas-dev
 
 volumes:
   postgres_data_dev:
   redis_data_dev:
+
+networks:
+  alertas-dev:
+    driver: bridge

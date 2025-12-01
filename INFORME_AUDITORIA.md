@@ -282,3 +282,43 @@ El equipo de desarrollo ha atendido todos los hallazgos de la auditoría de mane
 El proyecto se encuentra ahora en un estado que no solo cumple, sino que **supera las expectativas de la auditoría**. La base de código es robusta, limpia, escalable y un ejemplo a seguir.
 
 **Felicidades al equipo por su excelente trabajo. El proyecto tiene luz verde.**
+---
+
+## 8. Auditoría del Documento `METODOLOGIA.md`: Recomendaciones de Mejora
+
+El documento `METODOLOGIA.md` es excepcional en su detalle y visión. Sin embargo, basándome en los desafíos y soluciones encontradas durante la auditoría del proyecto, propongo las siguientes mejoras para hacerlo aún más robusto y explícito:
+
+### 8.1. Guía Explícita para Gestión de Ciclos de Vida (Lifetimes) de DI
+
+-   **Contexto:** El `AwilixResolutionError` ocurrido al inicio de la auditoría demostró la criticidad de la gestión de `Lifetimes` en Awilix. Aunque la metodología aborda la inyección de dependencias, no detalla explícitamente las reglas para `singleton`, `scoped` y `transient`.
+-   **Recomendación:** Añadir una sección dentro de "Stack Tecnológico" o "Proceso Obligatorio de Desarrollo" que explique:
+    -   Los diferentes tipos de `Lifetime` (`SINGLETON`, `SCOPED`, `TRANSIENT`).
+    -   Cuándo usar cada uno, con ejemplos concretos (ej. `SINGLETON` para servicios sin estado, clientes de DB, loggers; `SCOPED` para contexto por petición; `TRANSIENT` con precaución).
+    -   La regla fundamental: un componente con `Lifetime` corto no puede ser inyectado en uno con `Lifetime` largo (ej. `SCOPED` no puede depender de `SINGLETON`).
+
+### 8.2. Guía para Identificación y Resolución de Dependencias Circulares
+
+-   **Contexto:** El hallazgo de la dependencia circular entre el `TelegramAdapter` y los `Handlers` fue un punto clave de mejora arquitectónica. La metodología enfatiza la separación de responsabilidades y la multi-plataforma. Las dependencias circulares son un obstáculo directo para esto.
+-   **Recomendación:** Incluir una sección en "Reglas de Oro" o "Proceso Obligatorio de Desarrollo" que cubra:
+    -   Definición de dependencia circular y por qué es un "code smell".
+    -   Cómo Awilix puede detectarlas.
+    -   Estrategias de resolución, enfatizando la **creación de interfaces/abstracciones** (principio de Inversión de Dependencias) para romper el acoplamiento y permitir la inyección de solo la funcionalidad necesaria. Podría incluir el patrón de "Reply Service" como ejemplo.
+
+### 8.3. Actualización y Clarificación de Configuración de Herramientas
+
+-   **Contexto:** Se identificaron discrepancias en la documentación de herramientas como ESLint y la presencia/ausencia de otras.
+-   **Recomendación:**
+    -   **ESLint:** Actualizar la sección de configuración para reflejar el uso de `eslint.config.js` (el formato "flat config"), ya que es el estándar moderno.
+    -   **SWC:** Si `SWC` se usa en el workflow (incluso solo con `tsx` para desarrollo), añadirlo explícitamente al "Stack Tecnológico" con su justificación. Si no se considera esencial, el documento debería reflejar que no es parte del stack.
+    -   **`dotenv`:** Mencionar explícitamente cómo se cargan las variables de entorno para desarrollo (ej. `import 'dotenv/config';` en `main.ts`), para mayor claridad en el proceso de configuración.
+
+### 8.4. Prácticas de Logging al Arranque de la Aplicación
+
+-   **Contexto:** La corrección del `console.error` en `src/main.ts` introdujo una solución robusta para el logging de errores críticos antes de que el contenedor de DI esté completamente inicializado.
+-   **Recomendación:** Añadir esta práctica como una "Buena Práctica" en la sección de "Logging" o "Proceso Obligatorio de Desarrollo", explicando la necesidad de un logger de fallback para errores de arranque que ocurren antes de que el logger principal del DI esté disponible.
+
+---
+
+### Conclusión sobre `METODOLOGIA.md`
+
+Estas recomendaciones buscan consolidar aún más la excelencia del documento `METODOLOGIA.md`. Al incorporar las lecciones aprendidas de la implementación real del proyecto, el documento se convertirá en una guía aún más práctica y completa para el equipo de desarrollo.

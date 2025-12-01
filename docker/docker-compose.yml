@@ -1,23 +1,33 @@
 version: '3.8'
 
 services:
-  app:
+  bot:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
+      - PORT=3000
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/alertas_bot
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
+      - ALERT_MANAGER_IDS=${ALERT_MANAGER_IDS:-}
+      - OPERATOR_IDS=${OPERATOR_IDS:-}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - alertas-network
 
   db:
     image: postgres:16-alpine
@@ -35,6 +45,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - alertas-network
 
   redis:
     image: redis:7-alpine
@@ -49,7 +61,13 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - alertas-network
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  alertas-network:
+    driver: bridge
