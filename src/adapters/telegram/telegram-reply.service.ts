@@ -1,7 +1,10 @@
 import type { Bot } from 'grammy';
-import { InputFile } from 'grammy';
+import { InputFile, InlineKeyboard } from 'grammy';
 
-import type { IReplyService } from '../../application/ports/reply.service.interface.js';
+import type {
+  IReplyService,
+  InlineKeyboardData,
+} from '../../application/ports/reply.service.interface.js';
 import type { BotContext } from '../../container/types.js';
 
 /**
@@ -29,6 +32,26 @@ export class TelegramReplyService implements IReplyService {
         resize_keyboard: true,
         is_persistent: true,
       },
+    });
+  }
+
+  async sendWithInlineKeyboard(
+    chatId: string | number,
+    text: string,
+    inlineKeyboard: InlineKeyboardData,
+  ): Promise<void> {
+    const keyboard = new InlineKeyboard();
+
+    for (const row of inlineKeyboard.buttons) {
+      for (const button of row) {
+        keyboard.text(button.text, button.callbackData);
+      }
+      keyboard.row();
+    }
+
+    await this.bot.api.sendMessage(chatId, text, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard,
     });
   }
 

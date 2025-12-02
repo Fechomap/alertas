@@ -186,10 +186,9 @@ export class CommandHandler {
     }
 
     if (!(await this.isAlertManager(userId))) {
-      await this.replyService.sendWithKeyboard(
+      await this.replyService.sendMessage(
         chatId,
         '⛔ *Solo los Alert Manager pueden desactivar alertas.*',
-        getMainKeyboardArray(),
       );
       return;
     }
@@ -261,11 +260,7 @@ export class CommandHandler {
     const stoppedCount = await this.alertHandler.forceStopGroupAlerts(chatId);
 
     if (stoppedCount === 0) {
-      await this.replyService.sendWithKeyboard(
-        chatId,
-        '✅ *No había alertas activas para detener.*',
-        getMainKeyboardArray(),
-      );
+      await this.replyService.sendMessage(chatId, '✅ *No había alertas activas para detener.*');
     }
 
     this.logger.info({ userId, chatId, stoppedCount }, '/forcestop completed');

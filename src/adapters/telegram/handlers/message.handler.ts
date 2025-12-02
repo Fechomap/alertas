@@ -1,6 +1,9 @@
 import type { Bot } from 'grammy';
 
-import type { IReplyService } from '../../../application/ports/reply.service.interface.js';
+import type {
+  IReplyService,
+  InlineKeyboardData,
+} from '../../../application/ports/reply.service.interface.js';
 import type { AlertHandler } from './alert.handler.js';
 import type { Logger } from '../../../infrastructure/logging/logger.js';
 import type { BotContext } from '../../../container/types.js';
@@ -9,7 +12,6 @@ import type { IGroupRepository } from '../../../domain/repositories/group.reposi
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface.js';
 import { AlertType } from '../../../domain/value-objects/alert-type.vo.js';
 import { UserRole } from '../../../domain/value-objects/user-role.vo.js';
-import { getMainKeyboardArray, getConfirmationKeyboardArray } from '../keyboards/main.keyboard.js';
 
 interface ManiobraState {
   chatId: number;
@@ -63,9 +65,39 @@ export class MessageHandler {
   register(bot: Bot<BotContext>): void {
     bot.hears('📞 CONFERENCIA', async (ctx) => this.handleConferenciaToggle(ctx));
     bot.hears('🚗 MANIOBRAS', async (ctx) => this.handleManiobras(ctx));
-    bot.hears('✅ Confirmar', async (ctx) => this.handleConfirmManiobra(ctx));
-    bot.hears('❌ Cancelar', async (ctx) => this.handleCancelManiobra(ctx));
     bot.on('message:text', async (ctx) => this.handleTextMessage(ctx));
+
+    // Inline button callbacks for maniobra confirmation
+    bot.callbackQuery(/^maniobra:confirm:(\d+):(\d+)$/, async (ctx) => {
+      const match = ctx.match;
+      const userIdStr = match[1];
+      const quantityStr = match[2];
+      if (!userIdStr || !quantityStr) return;
+
+      const odUserId = parseInt(userIdStr, 10);
+      const quantity = parseInt(quantityStr, 10);
+      const chatId = ctx.chat?.id;
+      if (!chatId) return;
+
+      await ctx.answerCallbackQuery({ text: 'Procesando...' });
+      await ctx.deleteMessage();
+      await this.handleConfirmManiobraCallback(chatId, odUserId, quantity);
+    });
+
+    bot.callbackQuery(/^maniobra:cancel:(\d+)$/, async (ctx) => {
+      const match = ctx.match;
+      const userIdStr = match[1];
+      if (!userIdStr) return;
+
+      const userId = parseInt(userIdStr, 10);
+      const chatId = ctx.chat?.id;
+      if (!chatId) return;
+
+      await ctx.answerCallbackQuery({ text: 'Cancelado' });
+      this.userStates.delete(userId);
+      await ctx.deleteMessage();
+      await this.replyService.sendMessage(chatId, '❌ *Registro de maniobras cancelado.*');
+    });
 
     this.logger.info('Message handlers registered');
   }
@@ -103,10 +135,9 @@ export class MessageHandler {
           this.logger.warn({ userId, error: result.error }, 'Deactivation failed');
         }
       } else {
-        await this.replyService.sendWithKeyboard(
+        await this.replyService.sendMessage(
           chatId,
           '⚠️ *Ya hay una alerta activa.*\n\nSolo un Alert Manager puede desactivarla.',
-          getMainKeyboardArray(),
         );
         this.logger.warn({ userId }, 'User cannot deactivate (not Alert Manager)');
       }
@@ -126,21 +157,16 @@ export class MessageHandler {
       if (result.success) {
         this.logger.info({ userId, alertId: result.alertId }, 'Alert activated by operator');
       } else {
-        await this.replyService.sendWithKeyboard(
-          chatId,
-          `⚠️ *${result.error}*`,
-          getMainKeyboardArray(),
-        );
+        await this.replyService.sendMessage(chatId, `⚠️ *${result.error}*`);
         this.logger.warn({ userId, error: result.error }, 'Activation failed');
       }
       return;
     }
 
     this.logger.warn({ userId }, 'User has no permissions');
-    await this.replyService.sendWithKeyboard(
+    await this.replyService.sendMessage(
       chatId,
       '⛔ *No tienes permisos para activar alertas.*\n\nContacta al administrador.',
-      getMainKeyboardArray(),
     );
   }
 
@@ -157,10 +183,9 @@ export class MessageHandler {
     await this.ensureUserRegistered(ctx);
 
     if (!(await this.isAlertManager(userId))) {
-      await this.replyService.sendWithKeyboard(
+      await this.replyService.sendMessage(
         chatId,
         '⛔ *Solo los Alert Manager pueden registrar maniobras.*',
-        getMainKeyboardArray(),
       );
       return;
     }
@@ -171,10 +196,10 @@ export class MessageHandler {
       data: {},
     });
 
-    await this.replyService.sendWithKeyboard(
+    // Usar sendMessage para evitar el bug de iOS "Responder a"
+    await this.replyService.sendMessage(
       chatId,
       '🔢 *¿Cuántas maniobras autorizadas? (1-10)*\n\nEscribe el número:',
-      getMainKeyboardArray(),
     );
 
     this.logger.info({ userId }, 'Maniobras flow started');
@@ -190,13 +215,7 @@ export class MessageHandler {
     const state = this.userStates.get(userId);
     if (!state || state.chatId !== chatId) return;
 
-    if (
-      text === '📞 CONFERENCIA' ||
-      text === '🚗 MANIOBRAS' ||
-      text === '✅ Confirmar' ||
-      text === '❌ Cancelar' ||
-      text.startsWith('/')
-    ) {
+    if (text === '📞 CONFERENCIA' || text === '🚗 MANIOBRAS' || text.startsWith('/')) {
       return;
     }
 
@@ -214,55 +233,42 @@ export class MessageHandler {
     const quantity = parseInt(text, 10);
 
     if (isNaN(quantity) || quantity < 1 || quantity > 10) {
-      await this.replyService.sendWithKeyboard(
+      await this.replyService.sendMessage(
         chatId,
         '❌ *Por favor, ingresa un número válido entre 1 y 10.*',
-        getMainKeyboardArray(),
       );
       return;
     }
 
-    const state = this.userStates.get(userId);
-    if (!state) return;
-
-    state.data.quantity = quantity;
-    state.step = 'confirming';
-    this.userStates.set(userId, state);
+    // Clear the awaiting state - we're now showing inline confirmation
+    this.userStates.delete(userId);
 
     const confirmMessage = `*¿Confirmas el registro de ${quantity} maniobra(s)?*`;
 
-    await this.replyService.sendWithKeyboard(
-      chatId,
-      confirmMessage,
-      getConfirmationKeyboardArray(),
-    );
+    // Use inline keyboard for confirmation (buttons appear in the message)
+    const inlineButtons: InlineKeyboardData = {
+      buttons: [
+        [
+          { text: '✅ Confirmar', callbackData: `maniobra:confirm:${userId}:${quantity}` },
+          { text: '❌ Cancelar', callbackData: `maniobra:cancel:${userId}` },
+        ],
+      ],
+    };
+
+    await this.replyService.sendWithInlineKeyboard(chatId, confirmMessage, inlineButtons);
   }
 
-  private async handleConfirmManiobra(ctx: BotContext): Promise<void> {
-    const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-
-    if (!userId || !chatId) return;
-
-    const state = this.userStates.get(userId);
-    if (!state || state.step !== 'confirming' || state.chatId !== chatId) {
-      return;
-    }
-
-    const quantity = state.data.quantity;
-    if (!quantity) {
-      this.userStates.delete(userId);
-      return;
-    }
-
+  private async handleConfirmManiobraCallback(
+    chatId: number,
+    userId: number,
+    quantity: number,
+  ): Promise<void> {
     try {
       let group = await this.groupRepository.findByChatId(chatId.toString());
       if (!group) {
-        const chatInfo = await ctx.api.getChat(chatId);
-        const groupName = 'title' in chatInfo ? chatInfo.title : `Grupo ${chatId}`;
         group = await this.groupRepository.create({
           chatId: chatId.toString(),
-          name: groupName ?? `Grupo ${chatId}`,
+          name: `Grupo ${chatId}`,
         });
       }
 
@@ -270,8 +276,6 @@ export class MessageHandler {
       if (!user) {
         user = await this.userRepository.create({
           telegramId: BigInt(userId),
-          firstName: ctx.from?.first_name,
-          username: ctx.from?.username,
           role: UserRole.ALERT_MANAGER,
         });
       }
@@ -290,39 +294,16 @@ export class MessageHandler {
         `🔢 *Cantidad:* ${quantity}\n` +
         `📅 *Fecha:* ${new Date().toLocaleDateString('es-MX')}`;
 
-      await this.replyService.sendWithKeyboard(chatId, confirmMessage, getMainKeyboardArray());
+      await this.replyService.sendMessage(chatId, confirmMessage);
 
       this.logger.info({ quantity, userId, groupName: group.name }, 'Maniobra registered');
     } catch (error) {
       this.logger.error({ error }, 'Error saving maniobra');
-      await this.replyService.sendWithKeyboard(
+      await this.replyService.sendMessage(
         chatId,
         '❌ *Error al guardar las maniobras. Por favor, intenta nuevamente.*',
-        getMainKeyboardArray(),
       );
-    } finally {
-      this.userStates.delete(userId);
     }
-  }
-
-  private async handleCancelManiobra(ctx: BotContext): Promise<void> {
-    const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-
-    if (!userId || !chatId) return;
-
-    const state = this.userStates.get(userId);
-    if (!state || state.chatId !== chatId) {
-      return;
-    }
-
-    this.userStates.delete(userId);
-
-    await this.replyService.sendWithKeyboard(
-      chatId,
-      '❌ *Registro de maniobras cancelado.*',
-      getMainKeyboardArray(),
-    );
   }
 
   clearUserStates(chatId: number): void {

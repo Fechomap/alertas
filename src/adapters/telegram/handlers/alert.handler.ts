@@ -7,7 +7,6 @@ import {
   CANCELLATION_MESSAGES,
 } from '../../../domain/value-objects/alert-type.vo.js';
 import { APP_CONSTANTS } from '../../../shared/constants/app.constants.js';
-import { getMainKeyboardArray } from '../keyboards/main.keyboard.js';
 import type { Logger } from '../../../infrastructure/logging/logger.js';
 
 interface ActiveAlert {
@@ -95,7 +94,7 @@ export class AlertHandler {
 
       this.logger.info({ alertId, chatId, alertType, userId, userName }, 'Starting alert');
 
-      await this.replyService.sendWithKeyboard(chatId, message, getMainKeyboardArray());
+      await this.replyService.sendMessage(chatId, message);
 
       const interval = setInterval(async () => {
         const alert = this.alertsById.get(alertId);
@@ -107,7 +106,7 @@ export class AlertHandler {
         }
 
         try {
-          await this.replyService.sendWithKeyboard(chatId, message, getMainKeyboardArray());
+          await this.replyService.sendMessage(chatId, message);
           alert.messageCount++;
           this.logger.debug({ alertId, chatId, messageCount: alert.messageCount }, 'Alert tick');
         } catch (error) {
@@ -182,10 +181,9 @@ export class AlertHandler {
       if (!alert) {
         this.logger.warn({ alertType, chatId }, 'No active alert to deactivate');
 
-        await this.replyService.sendWithKeyboard(
+        await this.replyService.sendMessage(
           chatId,
           '🚫 *No hay una alerta activa para desactivar.*',
-          getMainKeyboardArray(),
         );
 
         return { success: false, error: 'No hay alerta activa' };
@@ -196,11 +194,7 @@ export class AlertHandler {
 
       if (stopped) {
         const cancellationMessage = CANCELLATION_MESSAGES[alertType];
-        await this.replyService.sendWithKeyboard(
-          chatId,
-          cancellationMessage,
-          getMainKeyboardArray(),
-        );
+        await this.replyService.sendMessage(chatId, cancellationMessage);
 
         this.logger.info({ alertId, chatId, alertType }, 'Alert deactivated');
 
@@ -229,10 +223,9 @@ export class AlertHandler {
       this.logger.info({ chatId, stoppedCount }, 'Force stopped group alerts');
 
       if (stoppedCount > 0) {
-        await this.replyService.sendWithKeyboard(
+        await this.replyService.sendMessage(
           chatId,
           `🛑 *${stoppedCount} alerta(s) detenida(s) forzosamente.*`,
-          getMainKeyboardArray(),
         );
       }
 

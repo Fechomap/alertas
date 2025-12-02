@@ -23,7 +23,8 @@ async function bootstrap(): Promise<void> {
 
   // Auto-detect Railway webhook URL
   const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
-  const webhookUrl = env.TELEGRAM_WEBHOOK_URL || (railwayDomain ? `https://${railwayDomain}/webhook` : null);
+  const webhookUrl =
+    env.TELEGRAM_WEBHOOK_URL || (railwayDomain ? `https://${railwayDomain}/webhook` : null);
 
   if (isDev || !webhookUrl) {
     // Modo polling para desarrollo
