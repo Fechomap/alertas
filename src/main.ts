@@ -21,14 +21,18 @@ async function bootstrap(): Promise<void> {
   // 3. Configurar bot de Telegram
   const isDev = env.NODE_ENV === 'development';
 
-  if (isDev || !env.TELEGRAM_WEBHOOK_URL) {
+  // Auto-detect Railway webhook URL
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+  const webhookUrl = env.TELEGRAM_WEBHOOK_URL || (railwayDomain ? `https://${railwayDomain}/webhook` : null);
+
+  if (isDev || !webhookUrl) {
     // Modo polling para desarrollo
     logger.info('Starting bot in polling mode (development)');
     await telegramAdapter.startPolling();
   } else {
     // Modo webhook para producción
-    logger.info({ webhookUrl: env.TELEGRAM_WEBHOOK_URL }, 'Configuring webhook');
-    await telegramAdapter.setupWebhook(env.TELEGRAM_WEBHOOK_URL, env.TELEGRAM_WEBHOOK_SECRET);
+    logger.info({ webhookUrl }, 'Configuring webhook');
+    await telegramAdapter.setupWebhook(webhookUrl, env.TELEGRAM_WEBHOOK_SECRET);
   }
 
   // 4. Iniciar servidor HTTP
@@ -41,8 +45,8 @@ async function bootstrap(): Promise<void> {
       logger.info({ port: info.port }, 'Server running');
       logger.info({ env: env.NODE_ENV }, 'Environment');
 
-      if (env.TELEGRAM_WEBHOOK_URL) {
-        logger.info({ webhookUrl: env.TELEGRAM_WEBHOOK_URL }, 'Webhook endpoint configured');
+      if (webhookUrl) {
+        logger.info({ webhookUrl }, 'Webhook endpoint configured');
       }
     },
   );
