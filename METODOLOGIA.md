@@ -1427,6 +1427,201 @@ export default defineConfig({
 
 ---
 
+## Docker y Railway: Deployment Production-Ready
+
+### Arquitectura Docker Multi-Stage
+
+El Dockerfile usa **3 stages** para optimizar el tamaño de la imagen:
+
+```dockerfile
+# ============================================
+# STAGE 1: Dependencies (solo producción)
+# ============================================
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+COPY prisma ./prisma/
+RUN npm ci --omit=dev && npx prisma generate
+
+# ============================================
+# STAGE 2: Builder (compila TypeScript)
+# ============================================
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+COPY prisma ./prisma/
+RUN npm ci
+COPY . .
+RUN npx prisma generate && npm run build
+
+# ============================================
+# STAGE 3: Production (imagen final mínima)
+# ============================================
+FROM node:22-alpine AS production
+RUN addgroup -g 1001 -S nodejs && adduser -S botuser -u 1001
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+COPY --from=deps --chown=botuser:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=botuser:nodejs /app/dist ./dist
+COPY --from=builder --chown=botuser:nodejs /app/package*.json ./
+COPY --from=builder --chown=botuser:nodejs /app/prisma ./prisma
+
+USER botuser
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "dist/main.js"]
+```
+
+**Beneficios:**
+- Imagen final ~150MB (vs ~800MB sin multi-stage)
+- Usuario no-root para seguridad
+- Healthcheck integrado
+- Solo dependencias de producción
+
+### Configuración Railway (railway.toml)
+
+```toml
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+```
+
+### Auto-Detección de Webhook en Railway
+
+El bot detecta automáticamente el dominio de Railway para webhooks:
+
+```typescript
+// src/main.ts
+const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+const webhookUrl = env.TELEGRAM_WEBHOOK_URL ||
+  (railwayDomain ? `https://${railwayDomain}/webhook` : null);
+
+if (isDev || !webhookUrl) {
+  // Polling para desarrollo local
+  await telegramAdapter.startPolling();
+} else {
+  // Webhook para producción (Railway)
+  await telegramAdapter.setupWebhook(webhookUrl, env.TELEGRAM_WEBHOOK_SECRET);
+}
+```
+
+**Comportamiento:**
+| Entorno | Variable | Modo |
+|---------|----------|------|
+| Local | `NODE_ENV=development` | Polling |
+| Railway | `RAILWAY_PUBLIC_DOMAIN` auto-provisto | Webhook |
+| Manual | `TELEGRAM_WEBHOOK_URL` | Webhook (override) |
+
+### Variables de Entorno para Railway
+
+```bash
+# Requeridas
+TELEGRAM_BOT_TOKEN=xxx
+DATABASE_URL=${{Postgres.DATABASE_URL}}    # Referencia interna Railway
+NODE_ENV=production
+PORT=3000
+
+# Opcionales
+ADMIN_CHAT_ID=123456789                     # ID del administrador
+REDIS_URL=${{Redis.REDIS_URL}}              # Si usas Redis en Railway
+
+# Auto-detectadas (NO configurar manualmente)
+# RAILWAY_PUBLIC_DOMAIN - Railway lo provee automáticamente
+```
+
+### Docker Compose para Desarrollo Local
+
+```yaml
+# docker/docker-compose.dev.yml
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file: ../.env
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3000:3000"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: alertas
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### Flujo de Deployment
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLUJO DE DEPLOYMENT                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  LOCAL (Desarrollo)                                             │
+│  ├── npm run dev (tsx watch)                                    │
+│  ├── Modo: Polling                                              │
+│  └── BD: Docker Compose (postgres + redis)                      │
+│                                                                 │
+│  DOCKER LOCAL (Testing)                                         │
+│  ├── docker-compose up --build                                  │
+│  ├── Modo: Polling (sin RAILWAY_PUBLIC_DOMAIN)                  │
+│  └── BD: Servicios internos del compose                         │
+│                                                                 │
+│  RAILWAY (Producción)                                           │
+│  ├── Push a main → Auto-deploy                                  │
+│  ├── Railway detecta Dockerfile                                 │
+│  ├── railway.toml configura healthcheck                         │
+│  ├── RAILWAY_PUBLIC_DOMAIN auto-provisto                        │
+│  ├── Modo: Webhook (auto-detectado)                             │
+│  └── BD: Postgres/Redis internos de Railway                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Comandos Útiles
+
+```bash
+# Desarrollo local
+npm run dev                           # Bot con hot-reload
+
+# Docker local
+docker-compose -f docker/docker-compose.dev.yml up --build
+
+# Verificar build
+npm run build && npm run type-check
+
+# Railway
+git push origin main                  # Auto-deploy
+railway logs                          # Ver logs (CLI)
+```
+
+---
+
 ## Checklist Nuevo Proyecto
 
 ```

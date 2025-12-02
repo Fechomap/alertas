@@ -1,189 +1,177 @@
-# Bot de Soporte Telegram
+# Bot de Alertas Telegram
 
-Bot de Telegram para gestión de alertas y maniobras en grupos de soporte.
+Bot de Telegram para gestión de alertas y maniobras en grupos de soporte técnico.
 
-## Descripción
+## Stack Tecnológico
 
-Este bot permite a operadores enviar alertas a grupos de Telegram y a los gestores de alertas (Alert Managers) cancelar esas alertas y registrar maniobras.
+- **Runtime:** Node.js 22 (ESM)
+- **Framework HTTP:** Hono
+- **Bot Framework:** grammY
+- **DI Container:** Awilix
+- **Base de Datos:** PostgreSQL + Prisma ORM
+- **Cache:** Redis
+- **Testing:** Vitest
+- **Linting:** ESLint (flat config) + Prettier
 
-## Requisitos Mínimos
+## Requisitos
 
-- Node.js 14.x o superior
-- MongoDB
-- Token de bot de Telegram (obtenido a través de BotFather)
-- Cuenta en Railway para despliegue
-- Git instalado
+- Node.js 22.x o superior
+- PostgreSQL 15+
+- Redis 7+
+- Token de bot de Telegram (BotFather)
+- Docker (opcional, para desarrollo local)
 
-## Configuración Rápida
+## Configuración
 
-1. Crea un archivo `.env` en la raíz del proyecto:
+1. Copia el archivo de ejemplo de variables de entorno:
 
+```bash
+cp .env.example .env
 ```
-TELEGRAM_BOT_TOKEN=tu_token_de_telegram_aquí
-MONGO_URI=tu_uri_de_mongodb_aquí
+
+2. Configura las variables en `.env`:
+
+```env
 NODE_ENV=development
+PORT=3000
+TELEGRAM_BOT_TOKEN=tu_token_aqui
+DATABASE_URL=postgresql://user:pass@localhost:5432/alertas
+REDIS_URL=redis://localhost:6379
+ADMIN_CHAT_ID=tu_telegram_id
 ```
 
-2. Instala las dependencias:
+3. Instala dependencias y genera cliente Prisma:
 
 ```bash
 npm install
+npx prisma generate
+npx prisma db push
 ```
 
-3. Inicia el bot en modo desarrollo:
+4. Inicia en desarrollo:
 
 ```bash
 npm run dev
 ```
 
-## Comandos Esenciales
+## Comandos del Bot
 
-### Comandos del Bot
+| Comando | Rol Requerido | Descripción |
+|---------|---------------|-------------|
+| `/start` | Todos | Muestra menú principal |
+| `/help` | Todos | Muestra ayuda |
+| `/stopalert` | ALERT_MANAGER+ | Cancela alertas activas |
+| `/report` | ALERT_MANAGER+ | Genera reporte semanal (Excel/ZIP) |
+| `/users` | ADMIN | Gestiona roles de usuarios |
 
-- `/start` - Inicia el bot y muestra el menú principal
-- `/help` - Muestra instrucciones de ayuda
-- `/stopalert` - (Solo Alert Managers) Cancela todas las alertas activas en el chat
-- `/report` - (Solo Alert Managers) Genera y envía el reporte semanal en Excel
+## Roles de Usuario
 
-### Comandos de Terminal (Local)
+| Rol | Permisos |
+|-----|----------|
+| `USER` | Solo visualizar |
+| `OPERATOR` | Iniciar alertas de conferencia |
+| `ALERT_MANAGER` | Cancelar alertas, registrar maniobras, generar reportes |
+| `ADMIN` | Todo + gestión de usuarios |
+
+Los roles se gestionan desde el bot con `/users` (solo ADMIN).
+
+## Scripts NPM
 
 ```bash
-# Desarrollo local (con auto-recarga)
-npm run dev
+# Desarrollo
+npm run dev          # Inicia con hot-reload
 
-# Iniciar en producción
-npm start
+# Build
+npm run build        # Compila TypeScript
 
-# Exportar datos a Excel
-npm run export
+# Producción
+npm start            # Ejecuta build compilado
 
-# Importar datos desde Excel
-npm run import
+# Calidad de código
+npm run lint         # ESLint
+npm run format       # Prettier
+npm run type-check   # TypeScript check
 
-# Limpiar base de datos
-npm run clear-db
+# Testing
+npm test             # Ejecuta tests
+npm run test:coverage # Tests con coverage
+
+# Base de datos
+npx prisma generate  # Genera cliente Prisma
+npx prisma db push   # Sincroniza schema
+npx prisma studio    # UI para explorar datos
 ```
 
-### Comandos Git y Railway
+## Docker (Desarrollo Local)
 
 ```bash
-# Git - Guardar cambios locales
-git add .
-git commit -m "Descripción del cambio"
+# Levantar servicios (PostgreSQL + Redis)
+cd docker
+docker-compose up -d
 
-# Git - Empujar a repositorio remoto
-git push origin main
-
-# Railway - Desplegar aplicación
-railway up
-
-# Railway - Ver logs en vivo
-railway logs
-
-# Railway - Gestión de variables de entorno
-railway variables set VARIABLE=valor
-
-# Railway - Reiniciar servicio
-railway restart
-
-# Railway - Obtener URL de producción
-railway status
+# Ver logs
+docker-compose logs -f
 ```
 
 ## Despliegue en Railway
 
-### 1. Configuración inicial
-
-```bash
-# Instalar Railway CLI
-npm i -g @railway/cli
-
-# Autenticarte en Railway
-railway login
-
-# Conectar proyecto con Railway
-railway init
-```
-
-### 2. Variables de entorno necesarias
+### Variables de Entorno Requeridas
 
 ```env
-TELEGRAM_BOT_TOKEN=tu_token
-MONGO_URI=mongodb+srv://...
 NODE_ENV=production
 PORT=3000
+TELEGRAM_BOT_TOKEN=tu_token
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+ADMIN_CHAT_ID=tu_telegram_id
 ```
 
-### 3. Despliegue
+### Opcional (para webhook automático)
+
+```env
+RAILWAY_PUBLIC_DOMAIN=tu-app.up.railway.app
+```
+
+Si no se configura, el bot usa polling mode.
+
+### Despliegue
+
+El proyecto usa Docker para el despliegue. Railway detecta automáticamente el `Dockerfile` y `railway.toml`.
 
 ```bash
-# Desplegar aplicación
-railway up
-
-# Ver el estado
-railway status
-
-# Ver logs
-railway logs --tail
+git push origin main  # Railway despliega automáticamente
 ```
 
-## Funcionalidades Principales
+## Arquitectura
 
-1. **Alertas de Conferencia** - Operadores pueden solicitar apoyo mediante alertas
-2. **Registro de Maniobras** - Alert Managers pueden registrar maniobras (1-10)
-3. **Generación de Reportes** - Ver informes de maniobras registradas en formato Excel
-
-## Tipos de Usuarios
-
-- **Operadores**: Pueden iniciar alertas
-- **Alert Managers**: Pueden cancelar alertas y registrar maniobras
-- **Super Admin**: Privilegios especiales de administración
-
-## Flujo de Uso Básico
-
-1. Operador solicita apoyo usando el botón de Conferencia
-2. El bot envía alertas periódicas al grupo
-3. Alert Manager cancela la alerta cuando se atiende
-4. Alert Manager registra maniobras realizadas
-
-## Solución de Problemas Comunes
-
-- **Bot no responde**: Verifica las credenciales en `.env`
-- **Errores de MongoDB**: Asegúrate que MongoDB esté ejecutándose
-- **Comandos no funcionan**: Verifica que el usuario tiene los permisos necesarios
-
-## Problemas Comunes con Railway
-
-Si el bot deja de responder en Railway:
-
-1. Verifica los logs: `railway logs`
-2. Reinicia la aplicación: `railway restart`
-3. Verifica las variables de entorno: `railway variables`
-4. Comprueba el estado del servicio: `railway status`
-5. Asegúrate que el webhook está configurado: logs deben mostrar "⚙️ Bot iniciado en modo WEBHOOK (producción)"
-
-## Variables de Configuración en Railway
-
-```bash
-# Ver todas las variables
-railway variables
-
-# Configurar variables
-railway variables set VARIABLE=valor
-
-# Eliminar una variable
-railway variables delete VARIABLE
+```
+src/
+├── adapters/          # Adaptadores externos (Telegram, HTTP)
+├── application/       # Casos de uso y puertos
+├── domain/            # Entidades y reglas de negocio
+├── infrastructure/    # Implementaciones (DB, Cache, Logger)
+├── container/         # Configuración de Awilix DI
+├── config/            # Configuración y validación de env
+└── main.ts            # Entry point
 ```
 
-## Monitoreo
+## Flujo de Uso
 
-```bash
-# Ver recursos utilizados
-railway metrics
+1. **Operador** solicita conferencia via botón
+2. Bot envía alertas periódicas al grupo
+3. **Alert Manager** cancela alerta cuando se atiende
+4. **Alert Manager** registra maniobras realizadas (1-10)
+5. **Alert Manager** genera reportes semanales
 
-# Ver estado detallado
-railway status -d
+## Solución de Problemas
 
-# Ver logs históricos
-railway logs --limit 500
-```
+| Problema | Solución |
+|----------|----------|
+| Bot no responde | Verificar `TELEGRAM_BOT_TOKEN` |
+| Error de conexión DB | Verificar `DATABASE_URL` |
+| Comandos no funcionan | Verificar rol del usuario con `/users` |
+| Webhook no funciona | Agregar `RAILWAY_PUBLIC_DOMAIN` |
+
+## Documentación Adicional
+
+- `METODOLOGIA.md` - Guía de arquitectura y estándares de desarrollo
