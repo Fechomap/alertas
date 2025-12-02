@@ -171,14 +171,11 @@ export class MessageHandler {
       data: {},
     });
 
-    await ctx.reply('🔢 *¿Cuántas maniobras autorizadas? (1-10)*\n\nEscribe el número:', {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        keyboard: getMainKeyboardArray(),
-        resize_keyboard: true,
-        is_persistent: true,
-      },
-    });
+    await this.replyService.sendWithKeyboard(
+      chatId,
+      '🔢 *¿Cuántas maniobras autorizadas? (1-10)*\n\nEscribe el número:',
+      getMainKeyboardArray(),
+    );
 
     this.logger.info({ userId }, 'Maniobras flow started');
   }
@@ -209,7 +206,7 @@ export class MessageHandler {
   }
 
   private async handleQuantityInput(
-    ctx: BotContext,
+    _ctx: BotContext,
     userId: number,
     text: string,
     chatId: number,
@@ -234,14 +231,11 @@ export class MessageHandler {
 
     const confirmMessage = `*¿Confirmas el registro de ${quantity} maniobra(s)?*`;
 
-    await ctx.reply(confirmMessage, {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        keyboard: getConfirmationKeyboardArray(),
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
+    await this.replyService.sendWithKeyboard(
+      chatId,
+      confirmMessage,
+      getConfirmationKeyboardArray(),
+    );
   }
 
   private async handleConfirmManiobra(ctx: BotContext): Promise<void> {
