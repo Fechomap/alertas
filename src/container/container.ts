@@ -88,19 +88,21 @@ export async function createContainer(): Promise<AwilixContainer<AppDependencies
 
   // Use Cases (singleton - sus dependencias también son singleton)
   container.register({
-    startAlertUseCase: asFunction((cradle) =>
-      new StartAlertUseCase(
-        cradle.alertRepository,
-        cradle.groupRepository,
-        cradle.userRepository,
-        cradle.logger,
-      ),
+    startAlertUseCase: asFunction(
+      (cradle) =>
+        new StartAlertUseCase(
+          cradle.alertRepository,
+          cradle.groupRepository,
+          cradle.userRepository,
+          cradle.logger,
+        ),
     ).singleton(),
-    stopAlertUseCase: asFunction((cradle) =>
-      new StopAlertUseCase(cradle.alertRepository, cradle.groupRepository, cradle.logger),
+    stopAlertUseCase: asFunction(
+      (cradle) =>
+        new StopAlertUseCase(cradle.alertRepository, cradle.groupRepository, cradle.logger),
     ).singleton(),
-    generateWeeklyReportUseCase: asFunction((cradle) =>
-      new GenerateWeeklyReportUseCase(cradle.maniobraRepository, cradle.logger),
+    generateWeeklyReportUseCase: asFunction(
+      (cradle) => new GenerateWeeklyReportUseCase(cradle.maniobraRepository, cradle.logger),
     ).singleton(),
   });
 
@@ -117,50 +119,53 @@ export async function createContainer(): Promise<AwilixContainer<AppDependencies
 
   // Alert Handler
   container.register({
-    alertHandler: asFunction((cradle) =>
-      new AlertHandler(cradle.logger, cradle.replyService),
+    alertHandler: asFunction(
+      (cradle) => new AlertHandler(cradle.logger, cradle.replyService),
     ).singleton(),
   });
 
   // Command Handler
   container.register({
-    commandHandler: asFunction((cradle) =>
-      new CommandHandler(
-        cradle.alertHandler,
-        cradle.env,
-        cradle.logger,
-        cradle.replyService,
-        cradle.generateWeeklyReportUseCase,
-      ),
+    commandHandler: asFunction(
+      (cradle) =>
+        new CommandHandler(
+          cradle.alertHandler,
+          cradle.env,
+          cradle.logger,
+          cradle.replyService,
+          cradle.generateWeeklyReportUseCase,
+          cradle.userRepository,
+        ),
     ).singleton(),
   });
 
   // Message Handler
   container.register({
-    messageHandler: asFunction((cradle) =>
-      new MessageHandler(
-        cradle.alertHandler,
-        cradle.env,
-        cradle.logger,
-        cradle.replyService,
-        cradle.maniobraRepository,
-        cradle.groupRepository,
-        cradle.userRepository,
-      ),
+    messageHandler: asFunction(
+      (cradle) =>
+        new MessageHandler(
+          cradle.alertHandler,
+          cradle.logger,
+          cradle.replyService,
+          cradle.maniobraRepository,
+          cradle.groupRepository,
+          cradle.userRepository,
+        ),
     ).singleton(),
   });
 
   // Telegram Adapter (coordina bot y handlers, sin dependencia circular)
   container.register({
-    telegramAdapter: asFunction((cradle) =>
-      new TelegramAdapter(
-        cradle.bot,
-        cradle.env,
-        cradle.logger,
-        cradle.commandHandler,
-        cradle.messageHandler,
-        cradle.alertHandler,
-      ),
+    telegramAdapter: asFunction(
+      (cradle) =>
+        new TelegramAdapter(
+          cradle.bot,
+          cradle.env,
+          cradle.logger,
+          cradle.commandHandler,
+          cradle.messageHandler,
+          cradle.alertHandler,
+        ),
     ).singleton(),
   });
 

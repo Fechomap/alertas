@@ -22,7 +22,10 @@ export interface IUserRepository {
   findById(id: string): Promise<User | null>;
   findByTelegramId(telegramId: bigint): Promise<User | null>;
   findAll(): Promise<User[]>;
+  findByRole(role: UserRole): Promise<User[]>;
   create(data: CreateUserData): Promise<User>;
   update(id: string, data: UpdateUserData): Promise<User>;
+  updateRole(telegramId: bigint, role: UserRole): Promise<User | null>;
+  upsert(data: CreateUserData): Promise<User>;
   delete(id: string): Promise<void>;
 }

@@ -2,7 +2,6 @@ import type { Bot } from 'grammy';
 
 import type { IReplyService } from '../../../application/ports/reply.service.interface.js';
 import type { AlertHandler } from './alert.handler.js';
-import type { Env } from '../../../config/env.js';
 import type { Logger } from '../../../infrastructure/logging/logger.js';
 import type { BotContext } from '../../../container/types.js';
 import type { IManiobraRepository } from '../../../domain/repositories/maniobra.repository.interface.js';
@@ -22,34 +21,43 @@ interface ManiobraState {
 
 export class MessageHandler {
   private readonly userStates: Map<number, ManiobraState> = new Map();
-  private readonly operatorIds: bigint[];
-  private readonly alertManagerIds: bigint[];
 
   constructor(
     private readonly alertHandler: AlertHandler,
-    private readonly env: Env,
     private readonly logger: Logger,
     private readonly replyService: IReplyService,
     private readonly maniobraRepository: IManiobraRepository,
     private readonly groupRepository: IGroupRepository,
     private readonly userRepository: IUserRepository,
   ) {
-    this.operatorIds = this.parseIds(this.env.OPERATOR_IDS);
-    this.alertManagerIds = this.parseIds(this.env.ALERT_MANAGER_IDS);
-
-    this.logger.info(
-      { operators: this.operatorIds.length, alertManagers: this.alertManagerIds.length },
-      'Auth config loaded',
-    );
+    this.logger.info('Message handler initialized (roles from DB)');
   }
 
-  private parseIds(idsString?: string): bigint[] {
-    if (!idsString) return [];
-    return idsString
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0)
-      .map((id) => BigInt(id));
+  private async ensureUserRegistered(ctx: BotContext): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    await this.userRepository.upsert({
+      telegramId: BigInt(userId),
+      username: ctx.from?.username,
+      firstName: ctx.from?.first_name,
+      lastName: ctx.from?.last_name,
+    });
+  }
+
+  private async getUserRole(userId: number): Promise<UserRole | null> {
+    const user = await this.userRepository.findByTelegramId(BigInt(userId));
+    return user?.role ?? null;
+  }
+
+  private async isOperator(userId: number): Promise<boolean> {
+    const role = await this.getUserRole(userId);
+    return role === UserRole.OPERATOR || role === UserRole.ADMIN;
+  }
+
+  private async isAlertManager(userId: number): Promise<boolean> {
+    const role = await this.getUserRole(userId);
+    return role === UserRole.ALERT_MANAGER || role === UserRole.ADMIN;
   }
 
   register(bot: Bot<BotContext>): void {
@@ -62,16 +70,6 @@ export class MessageHandler {
     this.logger.info('Message handlers registered');
   }
 
-  private isOperator(userId: number): boolean {
-    const userIdStr = userId.toString();
-    return this.operatorIds.some((id) => id.toString() === userIdStr);
-  }
-
-  private isAlertManager(userId: number): boolean {
-    const userIdStr = userId.toString();
-    return this.alertManagerIds.some((id) => id.toString() === userIdStr);
-  }
-
   private async handleConferenciaToggle(ctx: BotContext): Promise<void> {
     const chatId = ctx.chat?.id;
     const userId = ctx.from?.id;
@@ -82,8 +80,11 @@ export class MessageHandler {
       return;
     }
 
-    const isOperator = this.isOperator(userId);
-    const isAlertManager = this.isAlertManager(userId);
+    // Auto-register user
+    await this.ensureUserRegistered(ctx);
+
+    const isOperator = await this.isOperator(userId);
+    const isAlertManager = await this.isAlertManager(userId);
     const hasActiveAlert = this.alertHandler.hasActiveAlert(chatId, AlertType.CONFERENCIA);
 
     this.logger.info(
@@ -152,7 +153,10 @@ export class MessageHandler {
       return;
     }
 
-    if (!this.isAlertManager(userId)) {
+    // Auto-register user
+    await this.ensureUserRegistered(ctx);
+
+    if (!(await this.isAlertManager(userId))) {
       await this.replyService.sendWithKeyboard(
         chatId,
         '⛔ *Solo los Alert Manager pueden registrar maniobras.*',

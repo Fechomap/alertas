@@ -42,7 +42,15 @@ export class UserRepository implements IUserRepository {
   }
 
   async findAll(): Promise<User[]> {
-    const users = await this.prisma.user.findMany();
+    const users = await this.prisma.user.findMany({ orderBy: { firstName: 'asc' } });
+    return users.map((u) => this.mapToDomain(u));
+  }
+
+  async findByRole(role: UserRole): Promise<User[]> {
+    const users = await this.prisma.user.findMany({
+      where: { role: this.mapRole(role), isActive: true },
+      orderBy: { firstName: 'asc' },
+    });
     return users.map((u) => this.mapToDomain(u));
   }
 
@@ -71,6 +79,37 @@ export class UserRepository implements IUserRepository {
     const user = await this.prisma.user.update({
       where: { id },
       data: updateData,
+    });
+    return this.mapToDomain(user);
+  }
+
+  async updateRole(telegramId: bigint, role: UserRole): Promise<User | null> {
+    const user = await this.prisma.user.findUnique({ where: { telegramId } });
+    if (!user) return null;
+
+    const updated = await this.prisma.user.update({
+      where: { telegramId },
+      data: { role: this.mapRole(role) },
+    });
+    return this.mapToDomain(updated);
+  }
+
+  async upsert(data: CreateUserData): Promise<User> {
+    const user = await this.prisma.user.upsert({
+      where: { telegramId: data.telegramId },
+      create: {
+        telegramId: data.telegramId,
+        username: data.username ?? null,
+        firstName: data.firstName ?? null,
+        lastName: data.lastName ?? null,
+        role: this.mapRole(data.role ?? UserRole.USER),
+        isActive: data.isActive ?? true,
+      },
+      update: {
+        username: data.username ?? undefined,
+        firstName: data.firstName ?? undefined,
+        lastName: data.lastName ?? undefined,
+      },
     });
     return this.mapToDomain(user);
   }

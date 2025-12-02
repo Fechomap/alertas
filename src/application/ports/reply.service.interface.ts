@@ -7,11 +7,7 @@ export interface IReplyService {
   /**
    * Envía un mensaje con un teclado personalizado
    */
-  sendWithKeyboard(
-    chatId: string | number,
-    text: string,
-    keyboard: string[][],
-  ): Promise<void>;
+  sendWithKeyboard(chatId: string | number, text: string, keyboard: string[][]): Promise<void>;
 
   /**
    * Envía un mensaje simple
